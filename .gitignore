@@ -1,0 +1,37 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# === IDE и ОС ===
+.DS_Store
+Thumbs.db
+*.code-workspace
+.vscode/
+.idea/
+*.log
+
+# === Данные проекта (генерируются в рантайме) ===
+*.csv
+*.json
+saves/
+output/
+debug_screenshots/
+
+# === Тесты и покрытие ===
+.pytest_cache/
+.coverage
+htmlcov/
+test_results/
+
+# === Сборка/упаковка ===
+dist/
+build/
+*.egg-info/
+*.egg
