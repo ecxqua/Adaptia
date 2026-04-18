@@ -36,7 +36,7 @@ class GameLoop:
         while self.running:
             # dt передаётся в секундах для физической корректности
             # независимо от FPS.
-            dt = self.clock.get_time() / 1000.0
+            dt = self.clock.tick(cfg.FPS) / 1000.0
             
             self._handle_events()
             self._update(dt)

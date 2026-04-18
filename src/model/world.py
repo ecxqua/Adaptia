@@ -27,3 +27,13 @@ class World:
     def get_creature_count(self) -> int:
         """Возвращает текущее количество живых существ для отладки и UI."""
         return len(self.creatures)
+    
+    # ВРЕМЕННАЯ ОТЛАДКА (потом удалю)
+    def update(self, dt: float) -> None:
+        
+        import sys
+        if len(self.creatures) > 0:
+            c = self.creatures[0]
+            print(f"dt={dt:.4f} | vx={c.vx:.2f} | energy={c.energy:.2f}", end="\r", flush=True)
+        
+        self.creatures = [c for c in self.creatures if c.update(dt)]

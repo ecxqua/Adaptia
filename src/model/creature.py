@@ -41,26 +41,38 @@ class Creature:
     def _update_state(self) -> None:
         """Переключает состояние FSM в зависимости от уровня энергии."""
         if self.energy < 15.0:
+            # Критически мало энергии — пытаемся убежать/искать еду срочно
             self.state = State.FLEE
-        elif self.energy > cfg.ENERGY_THRESHOLD:
+        elif self.energy > 40.0:
+            # Много энергии — можно подумать о размножении
             self.state = State.REPRODUCE
         elif self.energy > 30.0:
+            # Средняя энергия — активно ищем еду
             self.state = State.SEEK
         else:
+            # Нормальное состояние 15-30 — спокойное блуждание
             self.state = State.WANDER
 
     def _apply_movement(self, dt: float) -> None:
-        """Применяет скорость к координатам. Добавляет случайное смещение в режиме WANDER."""
+        """Применяет скорость к координатам. Добавляет небольшой случайный импульс."""
+        # Базовый случайный импульс для всех состояний, чтобы не застревать на 0
+        self.vx += random.uniform(-0.5, 0.5)
+        self.vy += random.uniform(-0.5, 0.5)
+        
+        # Дополнительные поведения по состояниям
         if self.state == State.WANDER:
-            self.vx += random.uniform(-1.0, 1.0)
-            self.vy += random.uniform(-1.0, 1.0)
+            self.vx += random.uniform(-1.5, 1.5)
+            self.vy += random.uniform(-1.5, 1.5)
         elif self.state == State.FLEE:
-            # Временное ускорение до внедрения steering behaviors
-            self.vx *= 1.05
-            self.vy *= 1.05
+            self.vx *= 1.1
+            self.vy *= 1.1
+        elif self.state == State.REPRODUCE:
+            # Медленное блуждание при размножении
+            self.vx += random.uniform(-0.3, 0.3)
+            self.vy += random.uniform(-0.3, 0.3)
 
         # Ограничиваем максимальную скорость
-        max_speed = 60.0
+        max_speed = 150.0
         current_speed = (self.vx ** 2 + self.vy ** 2) ** 0.5
         if current_speed > max_speed:
             self.vx = (self.vx / current_speed) * max_speed
