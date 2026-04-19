@@ -12,25 +12,28 @@ class World:
     def __init__(self):
         self.creatures: list[Creature] = []
         self.food: list[tuple[float, float, float]] = []
+        self.grid = SpatialGrid(cell_size=50.0)
         self._spawn_initial_population()
 
     def update(self, dt: float) -> None:
-        """Обновляет всех существ за кадр. Погибшие удаляются из списка."""
-        # 1. Спавн еды (если повезло по вероятности)
         if random.random() < cfg.FOOD_SPAWN_RATE:
             self._spawn_food()
 
-        # 2. Обновление существ с передачей списка еды
-        # ВАЖНО: используем явный цикл, чтобы передать visible_food вторым аргументом
+        # Жизненный цикл сетки
+        self.grid.clear()  # 1. Очистить
+        for f in self.food:  # 2. Заполнить едой
+            self.grid.insert(f, (f[0], f[1]))
+
         alive_creatures = []
         for c in self.creatures:
-            nearby_food = self.food  # Пока передаём весь список еды
-            # Вызываем update с ДВУМЯ аргументами: dt и visible_food
-            if c.update(dt, nearby_food):
+            # 3. Запросить только еду в радиусе восприятия
+            nearby = self.grid.query_radius((c.x, c.y), cfg.PERCEPTION_RADIUS)
+            food_only = [item for item in nearby if isinstance(item, tuple) and len(item) == 3]
+            
+            if c.update(dt, food_only):  # Передаём отфильтрованный список
                 alive_creatures.append(c)
         self.creatures = alive_creatures
 
-        # 3. Проверка поедания (существа восстанавливают энергию)
         self._check_eating()
 
     def _spawn_initial_population(self) -> None:
@@ -53,18 +56,15 @@ class World:
         self.food.append((x, y, 15.0))
     
     def _check_eating(self) -> None:
-        """Проверяет, съели ли существа еду. Восстанавливает энергию, удаляет съеденное."""
-        eaten_ids = set()  # Храним id съеденной еды для безопасного удаления
-        
+        eaten_ids = set()
         for c in self.creatures:
-            for f in self.food:
-                # f — это кортеж (x, y, energy_value)
-                food_x, food_y, food_energy = f
-                # Проверяем коллизию: круг существа и круг еды (радиус еды = 4.0)
-                if check_circle_collision((c.x, c.y), c.radius, (food_x, food_y), 4.0):
-                    c.energy += food_energy  # Восстанавливаем энергию
-                    eaten_ids.add(id(f))      # Помечаем еду как съеденную
-        
-        # Удаляем съеденную еду после полного прохода (безопасно!)
+            # Запрос объектов в радиусе существа + радиус еды
+            nearby = self.grid.query_radius((c.x, c.y), c.radius + 4.0)
+            for item in nearby:
+                if isinstance(item, tuple) and len(item) == 3:
+                    fx, fy, fe = item
+                    if check_circle_collision((c.x, c.y), c.radius, (fx, fy), 4.0):
+                        c.energy += fe
+                        eaten_ids.add(id(item))
         self.food = [f for f in self.food if id(f) not in eaten_ids]
     
