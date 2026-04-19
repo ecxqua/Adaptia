@@ -55,16 +55,15 @@ class Creature:
             self.state = State.WANDER
 
     def _apply_movement(self, dt: float, visible_food: list[tuple[float, float, float]]) -> None:
-        """Применяет скорость к координатам. Добавляет небольшой случайный импульс."""
-        # Базовый случайный импульс для всех состояний, чтобы не застревать на 0
-        self.vx += random.uniform(-0.5, 0.5)
-        self.vy += random.uniform(-0.5, 0.5)
-        
-        if self.state == State.SEEK:
+        """Применяет силы управления к скорости существа (Steering Behaviors)."""
+        from src.algorithms import steering
+
+        force_x, force_y = 0.0, 0.0
+
+        # Рассчитываем силу в зависимости от состояния FSM
+        if self.state == State.SEEK and visible_food:
             closest_food_pos = None
             min_dist = float('inf')
-
-            # Ищем ближайший кусок еды в переданном списке
             for fx, fy, _ in visible_food:
                 dist_sq = (self.x - fx) ** 2 + (self.y - fy) ** 2
                 if dist_sq < min_dist:
@@ -72,46 +71,44 @@ class Creature:
                     closest_food_pos = (fx, fy)
 
             if closest_food_pos is not None:
-                target_x, target_y = closest_food_pos
-                dx = target_x - self.x
-                dy = target_y - self.y
+                fx, fy = steering.seek(
+                    (self.x, self.y), closest_food_pos, cfg.SEEK_SPEED, (self.vx, self.vy)
+                )
+                force_x += fx
+                force_y += fy
 
-                # Нормализация вектора: превращаем направление в единичный вектор
-                length = (dx ** 2 + dy ** 2) ** 0.5
-                if length > 0.1:  # Защита от деления на ноль и дрожания на цели
-                    dx /= length
-                    dy /= length
-                    # Явно задаём скорость к цели (не +=, чтобы не накапливалась)
-                    self.vx = dx * cfg.SEEK_SPEED
-                    self.vy = dy * cfg.SEEK_SPEED
-                else:
-                    # Цель достигнута — применяем базовый случайный импульс
-                    self.vx += random.uniform(-0.5, 0.5)
-                    self.vy += random.uniform(-0.5, 0.5)
-            else:
-                # Еды в радиусе видимости нет — продолжаем блуждать
-                self.vx += random.uniform(-0.5, 0.5)
-                self.vy += random.uniform(-0.5, 0.5)
+        elif self.state == State.WANDER:
+            force_x = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
+            force_y = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
 
-        # Дополнительные поведения по состояниям
-        if self.state == State.WANDER:
-            self.vx += random.uniform(-1.5, 1.5)
-            self.vy += random.uniform(-1.5, 1.5)
         elif self.state == State.FLEE:
-            self.vx *= 1.1
-            self.vy *= 1.1
-        elif self.state == State.REPRODUCE:
-            # Медленное блуждание при размножении
-            self.vx += random.uniform(-0.3, 0.3)
-            self.vy += random.uniform(-0.3, 0.3)
+            # Паника: резкое ускорение в случайном направлении
+            angle = random.uniform(0, math.pi * 2)
+            force_x = math.cos(angle) * cfg.SEEK_SPEED
+            force_y = math.sin(angle) * cfg.SEEK_SPEED
 
-        # Ограничиваем максимальную скорость
+        elif self.state == State.REPRODUCE:
+            force_x = random.uniform(-5.0, 5.0)
+            force_y = random.uniform(-5.0, 5.0)
+
+        # Ограничиваем силу поворота/ускорения (MAX_STEERING_FORCE)
+        force_len = (force_x ** 2 + force_y ** 2) ** 0.5
+        if force_len > cfg.MAX_STEERING_FORCE:
+            force_x = (force_x / force_len) * cfg.MAX_STEERING_FORCE
+            force_y = (force_y / force_len) * cfg.MAX_STEERING_FORCE
+
+        # Интегрируем силу в скорость (физика: v += a * dt)
+        self.vx += force_x * dt
+        self.vy += force_y * dt
+
+        # Ограничиваем максимальную скорость (не зависит от силы)
         max_speed = 150.0
         current_speed = (self.vx ** 2 + self.vy ** 2) ** 0.5
         if current_speed > max_speed:
             self.vx = (self.vx / current_speed) * max_speed
             self.vy = (self.vy / current_speed) * max_speed
 
+        # Обновляем позицию
         self.x += self.vx * dt
         self.y += self.vy * dt
 
