@@ -6,6 +6,7 @@ import random
 import config as cfg
 from src.model.creature import Creature
 from utils.collision import check_circle_collision
+from src.algorithms.spatial_grid import SpatialGrid
 
 class World:
     """Контейнер симуляции. Содержит все активные объекты."""
