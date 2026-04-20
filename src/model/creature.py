@@ -9,10 +9,11 @@ import random
 
 class State(Enum):
     """Состояния конечного автомата существа."""
-    WANDER = auto()
-    SEEK = auto()
-    FLEE = auto()
-    REPRODUCE = auto()
+    WANDER = auto() # Рандомное движение
+    SEEK = auto() # Активный поиск
+    FLEE = auto() # Паника/поиск еды
+
+    REPRODUCE = auto() # Сытость
 
 @dataclass
 class Creature:
