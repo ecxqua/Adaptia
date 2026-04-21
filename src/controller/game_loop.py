@@ -32,6 +32,9 @@ class GameLoop:
         # Модель и View создаются отдельно. GameLoop только оркестрирует их.
         self.world = World()
         self.renderer = Renderer(self.screen)
+
+        self.mode = GameMode.RUNNING          # Стартовый режим
+        self.speed_multiplier = 1.0           # Множитель времени
     
     def run(self) -> None:
         """Запускает основной игровой цикл.
@@ -52,12 +55,27 @@ class GameLoop:
         pygame.quit()
 
     def _handle_events(self) -> None:
-        """Обрабатывает события pygame (закрытие окна, ввод клавиш)."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            # TODO: Добавить обработку ESC (пауза) и цифр 1/2/5 (ускорение)
-            # Обработка ввода вынесена в отдельный метод для SRP (Single Responsibility Principle).
+            
+            # Обработка клавиш только в режиме RUNNING или PAUSED
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    # Переключение RUNNING - PAUSED
+                    self.mode = GameMode.PAUSED if self.mode == GameMode.RUNNING else GameMode.RUNNING
+                
+                elif self.mode == GameMode.RUNNING:
+                    if event.key == pygame.K_1:
+                        self.speed_multiplier = 1.0
+                    elif event.key == pygame.K_2:
+                        self.speed_multiplier = 2.0
+                    elif event.key == pygame.K_5:
+                        self.speed_multiplier = 5.0
+
+                # ЛКМ спавн еды (работает в любом режиме, кроме MENU)
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    self.world.spawn_food_at(event.pos[0], event.pos[1])
 
     def _update(self, dt: float) -> None:
         """Обновляет состояние мира на один кадр.
