@@ -4,7 +4,13 @@ import config as cfg
 
 from src.model.world import World
 from src.view.renderer import Renderer
+from enum import Enum, auto
 
+class GameMode(Enum):
+    MENU = auto()
+    RUNNING = auto()
+    PAUSED = auto()
+    SETTINGS = auto()
 
 class GameLoop:
     """Контроллер игрового цикла.
