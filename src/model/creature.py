@@ -7,6 +7,7 @@ from enum import Enum, auto
 import config as cfg
 import random
 from utils.math_helpers import distance_sq
+import math
 
 class State(Enum):
     """Состояния конечного автомата существа."""

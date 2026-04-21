@@ -5,6 +5,7 @@
 """
 import pygame
 from src.model.world import World
+import config as cfg
 
 # Цвета для визуализации состояний (R, G, B)
 STATE_COLORS = {
