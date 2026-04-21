@@ -67,7 +67,10 @@ class GameLoop:
         """
         # Делегируем обновление модели. Controller не должен знать,
         # как именно обновляются существа, еда или препятствия.
-        self.world.update(dt)
+        if self.mode != GameMode.RUNNING:
+            return  # Пауза/меню: логика не обновляется
+        effective_dt = dt * self.speed_multiplier
+        self.world.update(effective_dt)
 
     def _render(self) -> None:
         """Отрисовывает текущее состояние мира на экран."""

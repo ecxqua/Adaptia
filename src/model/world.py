@@ -69,3 +69,6 @@ class World:
                         eaten_ids.add(id(item))
         self.food = [f for f in self.food if id(f) not in eaten_ids]
     
+    def spawn_food_at(self, x: float, y: float) -> None: ...
+    def spawn_obstacle_at(self, x: float, y: float) -> None: ...  # заглушка
+    
