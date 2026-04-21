@@ -5,6 +5,7 @@ import config as cfg
 from src.model.world import World
 from src.view.renderer import Renderer
 from enum import Enum, auto
+from src.view.ui import UIManager
 
 class GameMode(Enum):
     MENU = auto()
@@ -35,6 +36,8 @@ class GameLoop:
 
         self.mode = GameMode.RUNNING          # Стартовый режим
         self.speed_multiplier = 1.0           # Множитель времени
+
+        self.ui = UIManager(self.screen)
     
     def run(self) -> None:
         """Запускает основной игровой цикл.
@@ -96,4 +99,9 @@ class GameLoop:
         # Цвет фона (20, 20, 25) соответствует минималистичному стилю ТЗ.
         self.screen.fill((20, 20, 25))
         self.renderer.draw_world(self.world)
+        
+        # HUD рисуется поверх мира
+        mode_name = self.mode.name if self.mode else "UNKNOWN"
+        self.ui.draw_hud(self.world.get_creature_count(), mode_name, self.speed_multiplier)
+        
         pygame.display.flip()
