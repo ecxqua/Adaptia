@@ -27,3 +27,4 @@ DIVERSITY_THRESHOLD: Final[float] = 0.15  # Порог для адаптивно
 MAX_STEERING_FORCE: Final[float] = 20.0  # Максимальная сила поворота/ускоренияz
 MUTATION_UP_FACTOR: Final[float] = 1.2
 MUTATION_DOWN_FACTOR: Final[float] = 0.95
+FITNESS_AGE_REWARD: Final[float] = 5.0  # Награда за каждую секунду жизни
