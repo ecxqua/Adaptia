@@ -51,10 +51,10 @@ def calculate_diversity(population: List[List[float]]) -> float:
         for j in range(i + 1, len(genomes)):
             for k in range(len(genomes[0])):
                 dist_sq += (genomes[i][k] - genomes[j][k]) ** 2
-            total_dist_sq += dist_sq**0.5
+            total_dist += dist_sq**0.5
             pair_count += 1
 
-    D_avg = total_dist_sq / pair_count
+    D_avg = total_dist / pair_count
 
     return min(1.0, D_avg / (len(genomes[0]) * 2.0))
 
