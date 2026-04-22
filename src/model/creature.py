@@ -6,13 +6,13 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 import config as cfg
 import random
+from utils.math_helpers import distance_sq
 
 class State(Enum):
     """Состояния конечного автомата существа."""
     WANDER = auto() # Рандомное движение
     SEEK = auto() # Активный поиск
     FLEE = auto() # Паника/поиск еды
-
     REPRODUCE = auto() # Сытость
 
 @dataclass
@@ -28,14 +28,14 @@ class Creature:
     # Гены будут использоваться позже для перцептрона и ген. алг-ма.
     genome: list[float] = field(default_factory=lambda: [0.0] * 8)
 
-    def update(self, dt: float) -> bool:
+    def update(self, dt: float, visible_food: list[tuple[float, float, float]]) -> bool:
         """Обновляет параметры существа за кадр. Возвращает False, если энергия <= 0."""
         self.energy -= cfg.ENERGY_DECAY * dt
         if self.energy <= 0:
             return False
 
         self._update_state()
-        self._apply_movement(dt)
+        self._apply_movement(dt, visible_food)
         self._clamp_to_bounds()
         return True
 
@@ -54,12 +54,45 @@ class Creature:
             # Нормальное состояние 15-30 — спокойное блуждание
             self.state = State.WANDER
 
-    def _apply_movement(self, dt: float) -> None:
+    def _apply_movement(self, dt: float, visible_food: list[tuple[float, float, float]]) -> None:
         """Применяет скорость к координатам. Добавляет небольшой случайный импульс."""
         # Базовый случайный импульс для всех состояний, чтобы не застревать на 0
         self.vx += random.uniform(-0.5, 0.5)
         self.vy += random.uniform(-0.5, 0.5)
         
+        if self.state == State.SEEK:
+            closest_food_pos = None
+            min_dist = float('inf')
+
+            # Ищем ближайший кусок еды в переданном списке
+            for fx, fy, _ in visible_food:
+                dist_sq = (self.x - fx) ** 2 + (self.y - fy) ** 2
+                if dist_sq < min_dist:
+                    min_dist = dist_sq
+                    closest_food_pos = (fx, fy)
+
+            if closest_food_pos is not None:
+                target_x, target_y = closest_food_pos
+                dx = target_x - self.x
+                dy = target_y - self.y
+
+                # Нормализация вектора: превращаем направление в единичный вектор
+                length = (dx ** 2 + dy ** 2) ** 0.5
+                if length > 0.1:  # Защита от деления на ноль и дрожания на цели
+                    dx /= length
+                    dy /= length
+                    # Явно задаём скорость к цели (не +=, чтобы не накапливалась)
+                    self.vx = dx * cfg.SEEK_SPEED
+                    self.vy = dy * cfg.SEEK_SPEED
+                else:
+                    # Цель достигнута — применяем базовый случайный импульс
+                    self.vx += random.uniform(-0.5, 0.5)
+                    self.vy += random.uniform(-0.5, 0.5)
+            else:
+                # Еды в радиусе видимости нет — продолжаем блуждать
+                self.vx += random.uniform(-0.5, 0.5)
+                self.vy += random.uniform(-0.5, 0.5)
+
         # Дополнительные поведения по состояниям
         if self.state == State.WANDER:
             self.vx += random.uniform(-1.5, 1.5)
