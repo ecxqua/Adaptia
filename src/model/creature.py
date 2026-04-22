@@ -28,16 +28,20 @@ class Creature:
     # Гены будут использоваться позже для перцептрона и ген. алг-ма.
     genome: list[float] = field(default_factory=lambda: [0.0] * 8)
 
-    def update(self, dt: float, visible_food: list[tuple[float, float, float]]) -> bool:
-        """Обновляет параметры существа за кадр. Возвращает False, если энергия <= 0."""
-        self.energy -= cfg.ENERGY_DECAY * dt
-        if self.energy <= 0:
-            return False
+    def update(self, dt: float) -> None:
+        """Обновляет всех существ за кадр. Погибшие удаляются из списка."""
+        if random.random() < cfg.FOOD_SPAWN_RATE:
+            self._spawn_food()
 
-        self._update_state()
-        self._apply_movement(dt, visible_food)
-        self._clamp_to_bounds()
-        return True
+        alive_creatures = []
+        for c in self.creatures:
+            # Передаём весь список еды. Позже заменить на grid.query_radius для оптимизации!!
+            nearby_food = self.food
+            if c.update(dt, nearby_food):
+                alive_creatures.append(c)
+        self.creatures = alive_creatures
+
+        self._check_eating()
 
     def _update_state(self) -> None:
         """Переключает состояние FSM в зависимости от уровня энергии."""
