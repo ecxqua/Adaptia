@@ -6,8 +6,6 @@
 import random
 import config as cfg
 from typing import List, Callable, Any
-import random
-
 
 def tournament_selection(population: List[Any], fitnesses: List[float], k: int) -> Any:
     """Отбирает одного родителя через турнир размера k."""
@@ -30,7 +28,7 @@ def mutate(genome: List[float], rate: float, strength: float) -> List[float]:
     for gene in genome:
         if random.random() < rate:
             # Гауссово распределение: чаще малые изменения, реже крупные скачки
-            new_gene += gene + random.gauss(0, strength)
+            new_gene = gene + random.gauss(0, strength)
         else:
             new_gene = gene
         child_genome.append(new_gene)
@@ -53,9 +51,9 @@ def calculate_diversity(population: List[List[float]]) -> float:
         for j in range(i + 1, len(genomes)):
             for k in range(len(genomes[0])):
                 dist_sq += (genomes[i][k] - genomes[j][k]) ** 2
-
             total_dist_sq += dist_sq**0.5
             pair_count += 1
+
     D_avg = total_dist_sq / pair_count
 
     return min(1.0, D_avg / (len(genomes[0]) * 2.0))
@@ -67,4 +65,5 @@ def adapt_mutation_rate(current_rate: float, diversity: float) -> float:
         new_rate = current_rate * cfg.MUTATION_UP_FACTOR  # множитель на увеличение
     else:
         new_rate = current_rate * cfg.MUTATION_DOWN_FACTOR # множитель на снижение
-    
+     # Ограничение диапазона + возврат
+    return max(cfg.MIN_MUTATION_RATE, min(cfg.MAX_MUTATION_RATE, new_rate))
