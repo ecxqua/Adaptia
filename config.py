@@ -24,5 +24,6 @@ MUTATION_STRENGTH: Final[float] = 0.2 # Насколько сильно може
 MIN_MUTATION_RATE: Final[float] = 0.02  # Для адаптивности
 MAX_MUTATION_RATE: Final[float] = 0.3
 DIVERSITY_THRESHOLD: Final[float] = 0.15  # Порог для адаптивной мутации
-
 MAX_STEERING_FORCE: Final[float] = 20.0  # Максимальная сила поворота/ускоренияz
+MUTATION_UP_FACTOR: Final[float] = 1.2
+MUTATION_DOWN_FACTOR: Final[float] = 0.95
