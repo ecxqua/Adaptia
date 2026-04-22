@@ -26,6 +26,15 @@ class Renderer:
             color = STATE_COLORS.get(data["state"], (255, 255, 255))
             pygame.draw.circle(self.screen, color, data["pos"], data["radius"])
 
+        # 🔹 ОТРИСОВКА ЕДЫ (добавь этот блок)
+        for food_x, food_y, _ in world.food:
+            # Маленькая зелёная точка, радиус 4
+            pygame.draw.circle(
+                self.screen,
+                (0, 255, 0),  # ярко-зелёный
+                (int(food_x), int(food_y)),
+                4  # радиус еды меньше, чем у существ (6)
+            )
         # Отладочная инфа в углу экрана
         if hasattr(world, 'get_creature_count'):
             font = pygame.font.SysFont("consolas", 12)
