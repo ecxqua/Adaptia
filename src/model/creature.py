@@ -4,17 +4,21 @@
 """
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from typing import Optional, List, Tuple
 import config as cfg
 import random
-from utils.math_helpers import distance_sq
 import math
+from utils.math_helpers import distance_sq
+from src.algorithms.perceptron import SimplePerceptron  # ← Путь к твоему перцептрону
+
 
 class State(Enum):
     """Состояния конечного автомата существа."""
-    WANDER = auto() # Рандомное движение
-    SEEK = auto() # Активный поиск
-    FLEE = auto() # Паника/поиск еды
-    REPRODUCE = auto() # Сытость
+    WANDER = auto()     # Рандомное движение
+    SEEK = auto()       # Активный поиск еды
+    FLEE = auto()       # Избегание опасности / паника
+    REPRODUCE = auto()  # Сытость
+
 
 @dataclass
 class Creature:
@@ -27,43 +31,56 @@ class Creature:
     age: float = 0.0
     radius: float = 6.0
     state: State = State.WANDER
-    # Гены будут использоваться позже для перцептрона и ген. алг-ма.
     genome: list[float] = field(default_factory=lambda: [0.0] * 8)
+    
+    # Поле для перцептрона. repr=False скрывает объект мозга при отладке print()
+    brain: Optional[SimplePerceptron] = field(default=None, repr=False)
 
-    def update(self, dt: float, visible_food: list[tuple[float, float, float]]) -> bool:
-        """Обновляет параметры существа за кадр. Возвращает False, если энергия <= 0."""
+    def __post_init__(self) -> None:
+        """Инициализирует мозг из генома. Первые 7 генов → веса, последний → bias."""
+        if self.brain is None:
+            self.brain = SimplePerceptron(
+                weights=self.genome[:-1], 
+                bias=self.genome[-1]
+            )
+
+    def update(self, dt: float, visible_food: List[Tuple[float, float, float]]) -> bool:
+        """Обновляет параметры существа за кадр. Перцептрон управляет состоянием."""
         self.energy -= cfg.ENERGY_DECAY * dt
         if self.energy <= 0:
             return False
 
-        self._update_state()
-        self._apply_movement(dt, visible_food)  # передаём visible_food
-        self._clamp_to_bounds()
-        self.age += dt  # Считаем время выживания
-        return True
+        # Подготовка сенсоров (входы перцептрона)
+        # Нормализация к [0, 1] стабилизирует работу tanh и ускоряет эволюцию
+        food_signal = 1.0 if visible_food else 0.0
+        energy_signal = max(0.0, min(1.0, self.energy / 50.0))
+        # Дополняем до 7 входов под размер genome[:-1]
+        sensors = [food_signal, energy_signal, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-    def _update_state(self) -> None:
-        """Переключает состояние FSM в зависимости от уровня энергии."""
-        if self.energy < 15.0:
-            # Критически мало энергии — пытаемся убежать/искать еду срочно
-            self.state = State.FLEE
-        elif self.energy > 40.0:
-            # Много энергии — можно подумать о размножении
-            self.state = State.REPRODUCE
-        elif self.energy > 30.0:
-            # Средняя энергия — активно ищем еду
+        # Запрос решения у перцептрона
+        decision = self.brain.compute(sensors)  # Возвращает float ∈ [-1, 1]
+
+        if decision > 0.4:
             self.state = State.SEEK
+        elif decision < -0.4:
+            self.state = State.FLEE
         else:
-            # Нормальное состояние 15-30 — спокойное блуждание
             self.state = State.WANDER
 
-    def _apply_movement(self, dt: float, visible_food: list[tuple[float, float, float]]) -> None:
+        # Применение сил и физика (steering-логика остаётся в _apply_movement)
+        self._apply_movement(dt, visible_food)
+        self._clamp_to_bounds()
+        self.age += dt
+        return True
+
+    # теперь состоянием управляет перцептрон!
+
+    def _apply_movement(self, dt: float, visible_food: List[Tuple[float, float, float]]) -> None:
         """Применяет силы управления к скорости существа (Steering Behaviors)."""
         from src.algorithms import steering
 
         force_x, force_y = 0.0, 0.0
 
-        # Рассчитываем силу в зависимости от состояния FSM
         if self.state == State.SEEK and visible_food:
             closest_food_pos = None
             min_dist = float('inf')
@@ -85,7 +102,6 @@ class Creature:
             force_y = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
 
         elif self.state == State.FLEE:
-            # Паника: резкое ускорение в случайном направлении
             angle = random.uniform(0, math.pi * 2)
             force_x = math.cos(angle) * cfg.SEEK_SPEED
             force_y = math.sin(angle) * cfg.SEEK_SPEED
@@ -94,7 +110,7 @@ class Creature:
             force_x = random.uniform(-5.0, 5.0)
             force_y = random.uniform(-5.0, 5.0)
 
-        # Ограничиваем силу поворота/ускорения (MAX_STEERING_FORCE)
+        # Ограничиваем силу поворота/ускорения
         force_len = (force_x ** 2 + force_y ** 2) ** 0.5
         if force_len > cfg.MAX_STEERING_FORCE:
             force_x = (force_x / force_len) * cfg.MAX_STEERING_FORCE
@@ -104,7 +120,7 @@ class Creature:
         self.vx += force_x * dt
         self.vy += force_y * dt
 
-        # Ограничиваем максимальную скорость (не зависит от силы)
+        # Ограничиваем максимальную скорость
         max_speed = 150.0
         current_speed = (self.vx ** 2 + self.vy ** 2) ** 0.5
         if current_speed > max_speed:
