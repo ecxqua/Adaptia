@@ -28,3 +28,8 @@ MAX_STEERING_FORCE: Final[float] = 20.0  # Максимальная сила п�
 MUTATION_UP_FACTOR: Final[float] = 1.2
 MUTATION_DOWN_FACTOR: Final[float] = 0.95
 FITNESS_AGE_REWARD: Final[float] = 5.0  # Награда за каждую секунду жизни
+
+# A* Pathfinding
+GRID_CELL_SIZE: Final[float] = 40.0  # Размер клетки сетки
+GRID_WIDTH: Final[int] = int(SCREEN_WIDTH / GRID_CELL_SIZE)
+GRID_HEIGHT: Final[int] = int(SCREEN_HEIGHT / GRID_CELL_SIZE)
