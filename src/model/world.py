@@ -8,6 +8,7 @@ from src.model.creature import Creature
 from utils.collision import check_circle_collision
 from src.algorithms.spatial_grid import SpatialGrid
 from src.model.population import Population
+from src.algorithms.astar import AStarPathfinder
 
 class World:
     """Контейнер симуляции. Содержит все активные объекты."""
@@ -20,6 +21,21 @@ class World:
         self.evolution_timer = 0.0                           
         
         self._spawn_initial_population()
+
+        # Инициализация A* навигации
+        self.pathfinder = AStarPathfinder(
+            grid_width=cfg.GRID_WIDTH,
+            grid_height=cfg.GRID_HEIGHT,
+            cell_size=cfg.GRID_CELL_SIZE
+        )
+    
+    def add_obstacle(self, x: float, y: float) -> None:
+        """Добавляет препятствие для навигации."""
+        self.pathfinder.add_obstacle(x, y)
+    
+    def remove_obstacle(self, x: float, y: float) -> None:
+        """Удаляет препятствие."""
+        self.pathfinder.remove_obstacle(x, y)
 
     def update(self, dt: float) -> None:
         if random.random() < cfg.FOOD_SPAWN_RATE:
