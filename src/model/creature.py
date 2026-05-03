@@ -33,6 +33,17 @@ class Creature:
     state: State = State.WANDER
     genome: list[float] = field(default_factory=lambda: [0.0] * 8)
     
+    def find_path_to_food(self, visible_food: list) -> Optional[List[Tuple[float, float]]]:
+        """Находит путь к ближайшей еде через A*."""
+        if not visible_food:
+            return None
+        
+        # Находим ближайшую еду
+        closest = min(visible_food, key=lambda f: distance_sq((self.x, self.y), (f[0], f[1])))
+        
+        # Запрашиваем путь у pathfinder
+        return self.pathfinder.find_path(self.x, self.y, closest[0], closest[1])
+
     # Поле для перцептрона. repr=False скрывает объект мозга при отладке print()
     brain: Optional[SimplePerceptron] = field(default=None, repr=False)
 
