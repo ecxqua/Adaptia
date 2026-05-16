@@ -62,12 +62,10 @@ class GameLoop:
             if event.type == pygame.QUIT:
                 self.running = False
             
-            # Обработка клавиш только в режиме RUNNING или PAUSED
+            # Обработка клавиш
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    # Переключение RUNNING - PAUSED
                     self.mode = GameMode.PAUSED if self.mode == GameMode.RUNNING else GameMode.RUNNING
-                
                 elif self.mode == GameMode.RUNNING:
                     if event.key == pygame.K_1:
                         self.speed_multiplier = 1.0
@@ -76,9 +74,13 @@ class GameLoop:
                     elif event.key == pygame.K_5:
                         self.speed_multiplier = 5.0
 
-                # ЛКМ спавн еды (работает в любом режиме, кроме MENU)
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    self.world.spawn_food_at(event.pos[0], event.pos[1])
+            # Обработка мыши 
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = event.pos
+                if event.button == 1:  # ЛКМ = еда
+                    self.world.spawn_food_at(x, y)
+                elif event.button == 3:  # ПКМ = препятствие
+                    self.world.spawn_obstacle_at(x, y)
 
     def _update(self, dt: float) -> None:
         """Обновляет состояние мира на один кадр.
