@@ -9,7 +9,8 @@ import config as cfg
 import random
 import math
 from utils.math_helpers import distance_sq
-from src.algorithms.perceptron import SimplePerceptron  # ← Путь к твоему перцептрону
+from src.algorithms.perceptron import SimplePerceptron
+from src.algorithms.astar import AStarPathfinder
 
 
 class State(Enum):
@@ -32,17 +33,13 @@ class Creature:
     radius: float = 6.0
     state: State = State.WANDER
     genome: list[float] = field(default_factory=lambda: [0.0] * 8)
-    
-    def find_path_to_food(self, visible_food: list) -> Optional[List[Tuple[float, float]]]:
-        """Находит путь к ближайшей еде через A*."""
-        if not visible_food:
-            return None
-        
-        # Находим ближайшую еду
-        closest = min(visible_food, key=lambda f: distance_sq((self.x, self.y), (f[0], f[1])))
-        
-        # Запрашиваем путь у pathfinder
-        return self.pathfinder.find_path(self.x, self.y, closest[0], closest[1])
+    # Навигация по A*
+    current_path: Optional[List[Tuple[float, float]]] = field(default=None, repr=False)
+    path_index: int = 0
+    # Ссылка на pathfinder для проверки препятствий во всех состояниях
+    _pathfinder: Optional[AStarPathfinder] = field(default=None, repr=False)
+    # Таймер для ограничения частоты пересчёта пути (оптимизация)
+    _last_path_recalc: float = 0.0
 
     # Поле для перцептрона. repr=False скрывает объект мозга при отладке print()
     brain: Optional[SimplePerceptron] = field(default=None, repr=False)
@@ -51,25 +48,32 @@ class Creature:
         """Инициализирует мозг из генома. Первые 7 генов → веса, последний → bias."""
         if self.brain is None:
             self.brain = SimplePerceptron(
-                weights=self.genome[:-1], 
+                weights=self.genome[:-1],
                 bias=self.genome[-1]
             )
 
-    def update(self, dt: float, visible_food: List[Tuple[float, float, float]]) -> bool:
+    def update(
+        self,
+        dt: float,
+        visible_food: List[Tuple[float, float, float]],
+        pathfinder: Optional[AStarPathfinder] = None
+    ) -> bool:
         """Обновляет параметры существа за кадр. Перцептрон управляет состоянием."""
         self.energy -= cfg.ENERGY_DECAY * dt
         if self.energy <= 0:
             return False
 
+        # Обновляем ссылку на pathfinder (на случай если не была установлена)
+        if pathfinder is not None:
+            self._pathfinder = pathfinder
+
         # Подготовка сенсоров (входы перцептрона)
-        # Нормализация к [0, 1] стабилизирует работу tanh и ускоряет эволюцию
         food_signal = 1.0 if visible_food else 0.0
         energy_signal = max(0.0, min(1.0, self.energy / 50.0))
-        # Дополняем до 7 входов под размер genome[:-1]
         sensors = [food_signal, energy_signal, 0.0, 0.0, 0.0, 0.0, 0.0]
 
         # Запрос решения у перцептрона
-        decision = self.brain.compute(sensors)  # Возвращает float ∈ [-1, 1]
+        decision = self.brain.compute(sensors)
 
         if decision > 0.4:
             self.state = State.SEEK
@@ -78,13 +82,81 @@ class Creature:
         else:
             self.state = State.WANDER
 
-        # Применение сил и физика (steering-логика остаётся в _apply_movement)
-        self._apply_movement(dt, visible_food)
+        # Навигация
+        if self.state == State.SEEK and visible_food and pathfinder:
+            closest_food = min(visible_food, key=lambda f: distance_sq((self.x, self.y), (f[0], f[1])))
+            dist_to_food = distance_sq((self.x, self.y), (closest_food[0], closest_food[1])) ** 0.5
+
+            # Если еда близко (< 3 клеток), идём напрямую
+            if dist_to_food < cfg.GRID_CELL_SIZE * 3:
+                self._apply_steering(dt, closest_food[0], closest_food[1])
+                self.current_path = None
+                self.path_index = 0
+            else:
+                # Пересчитываем путь только если:
+                # 1. Пути нет
+                # 2. Путь закончился
+                # 3. Прошло больше 1 секунды с последнего пересчёта
+                should_recalculate = (
+                    self.current_path is None or
+                    self.path_index >= len(self.current_path) or
+                    (self.age - self._last_path_recalc) > 1.0
+                )
+
+                if should_recalculate:
+                    self.current_path = pathfinder.find_path(
+                        self.x, self.y,
+                        closest_food[0], closest_food[1]
+                    )
+                    self.path_index = 0
+                    self._last_path_recalc = self.age
+
+                # Двигаемся по пути
+                if self.current_path and self.path_index < len(self.current_path):
+                    target_x, target_y = self.current_path[self.path_index]
+                    dist_to_waypoint = distance_sq((self.x, self.y), (target_x, target_y))
+                    
+                    # Порог достижения waypoint = полная клетка
+                    if dist_to_waypoint < cfg.GRID_CELL_SIZE ** 2:
+                        self.path_index += 1
+
+                    if self.path_index < len(self.current_path):
+                        self._apply_steering(dt, target_x, target_y)
+                    else:
+                        self._apply_steering(dt, closest_food[0], closest_food[1])
+                        self.current_path = None
+                else:
+                    # Путь не найден → блуждаем
+                    self._apply_wander(dt)
+        else:
+            # Не SEEK → обычное поведение с проверкой препятствий
+            self._apply_movement(dt, visible_food)
+
         self._clamp_to_bounds()
         self.age += dt
         return True
 
-    # теперь состоянием управляет перцептрон!
+    def _check_obstacle_collision(self, new_x: float, new_y: float) -> bool:
+        """
+        Проверяет, есть ли препятствие на пути от текущей позиции к новой.
+        Использует line sweep для надёжной проверки.
+        Returns True если есть препятствие.
+        """
+        if self._pathfinder is None:
+            return False
+
+        # Проверяем несколько точек вдоль траектории (line sweep)
+        steps = max(2, int(distance_sq((self.x, self.y), (new_x, new_y)) ** 0.5 / (cfg.GRID_CELL_SIZE / 2)))
+        
+        for i in range(steps + 1):
+            t = i / steps if steps > 0 else 0
+            check_x = self.x + (new_x - self.x) * t
+            check_y = self.y + (new_y - self.y) * t
+            grid_pos = self._pathfinder.world_to_grid(check_x, check_y)
+            if grid_pos in self._pathfinder.obstacles:
+                return True
+        
+        return False
 
     def _apply_movement(self, dt: float, visible_food: List[Tuple[float, float, float]]) -> None:
         """Применяет силы управления к скорости существа (Steering Behaviors)."""
@@ -92,23 +164,7 @@ class Creature:
 
         force_x, force_y = 0.0, 0.0
 
-        if self.state == State.SEEK and visible_food:
-            closest_food_pos = None
-            min_dist = float('inf')
-            for fx, fy, _ in visible_food:
-                dist_sq = (self.x - fx) ** 2 + (self.y - fy) ** 2
-                if dist_sq < min_dist:
-                    min_dist = dist_sq
-                    closest_food_pos = (fx, fy)
-
-            if closest_food_pos is not None:
-                fx, fy = steering.seek(
-                    (self.x, self.y), closest_food_pos, cfg.SEEK_SPEED, (self.vx, self.vy)
-                )
-                force_x += fx
-                force_y += fy
-
-        elif self.state == State.WANDER:
+        if self.state == State.WANDER:
             force_x = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
             force_y = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
 
@@ -121,13 +177,13 @@ class Creature:
             force_x = random.uniform(-5.0, 5.0)
             force_y = random.uniform(-5.0, 5.0)
 
-        # Ограничиваем силу поворота/ускорения
+        # Ограничиваем силу
         force_len = (force_x ** 2 + force_y ** 2) ** 0.5
         if force_len > cfg.MAX_STEERING_FORCE:
             force_x = (force_x / force_len) * cfg.MAX_STEERING_FORCE
             force_y = (force_y / force_len) * cfg.MAX_STEERING_FORCE
 
-        # Интегрируем силу в скорость (физика: v += a * dt)
+        # Интегрируем силу в скорость
         self.vx += force_x * dt
         self.vy += force_y * dt
 
@@ -138,9 +194,21 @@ class Creature:
             self.vx = (self.vx / current_speed) * max_speed
             self.vy = (self.vy / current_speed) * max_speed
 
+        # Вычисляем новую позицию
+        new_x = self.x + self.vx * dt
+        new_y = self.y + self.vy * dt
+
+        # Проверяем препятствия с помощью line sweep
+        if self._check_obstacle_collision(new_x, new_y):
+            # Препятствие! Разворачиваемся
+            self.vx = -self.vx + random.uniform(-20, 20)
+            self.vy = -self.vy + random.uniform(-20, 20)
+            # Не обновляем позицию
+            return
+
         # Обновляем позицию
-        self.x += self.vx * dt
-        self.y += self.vy * dt
+        self.x = new_x
+        self.y = new_y
 
     def _clamp_to_bounds(self) -> None:
         """Удерживает существо в пределах игрового окна."""
@@ -148,10 +216,77 @@ class Creature:
         self.y = max(self.radius, min(self.y, cfg.SCREEN_HEIGHT - self.radius))
 
     def get_render_data(self) -> dict:
-        """Возвращает чистые данные для View. Модель не должна знать про pygame.draw."""
+        """Возвращает чистые данные для View."""
         return {
             "pos": (self.x, self.y),
             "radius": self.radius,
             "state": self.state.name,
             "energy": self.energy
         }
+
+    def _apply_steering(self, dt: float, target_x: float, target_y: float) -> None:
+        """Движение к конкретной точке (для A* waypoints)."""
+        from src.algorithms import steering
+
+        force_x, force_y = steering.seek(
+            (self.x, self.y),
+            (target_x, target_y),
+            cfg.SEEK_SPEED,
+            (self.vx, self.vy)
+        )
+
+        # Ограничиваем силу
+        force_len = (force_x ** 2 + force_y ** 2) ** 0.5
+        if force_len > cfg.MAX_STEERING_FORCE:
+            force_x = (force_x / force_len) * cfg.MAX_STEERING_FORCE
+            force_y = (force_y / force_len) * cfg.MAX_STEERING_FORCE
+
+        # Применяем физику
+        self.vx += force_x * dt
+        self.vy += force_y * dt
+
+        max_speed = 150.0
+        current_speed = (self.vx ** 2 + self.vy ** 2) ** 0.5
+        if current_speed > max_speed:
+            self.vx = (self.vx / current_speed) * max_speed
+            self.vy = (self.vy / current_speed) * max_speed
+
+        # Вычисляем новую позицию
+        new_x = self.x + self.vx * dt
+        new_y = self.y + self.vy * dt
+
+        # Проверяем препятствия
+        if self._check_obstacle_collision(new_x, new_y):
+            # Препятствие! Разворачиваемся
+            self.vx = -self.vx + random.uniform(-20, 20)
+            self.vy = -self.vy + random.uniform(-20, 20)
+            return
+
+        self.x = new_x
+        self.y = new_y
+
+    def _apply_wander(self, dt: float) -> None:
+        """Случайное блуждание."""
+        force_x = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
+        force_y = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
+
+        self.vx += force_x * dt
+        self.vy += force_y * dt
+
+        max_speed = 150.0
+        current_speed = (self.vx ** 2 + self.vy ** 2) ** 0.5
+        if current_speed > max_speed:
+            self.vx = (self.vx / current_speed) * max_speed
+            self.vy = (self.vy / current_speed) * max_speed
+
+        new_x = self.x + self.vx * dt
+        new_y = self.y + self.vy * dt
+
+        # Проверяем препятствия
+        if self._check_obstacle_collision(new_x, new_y):
+            self.vx = -self.vx + random.uniform(-20, 20)
+            self.vy = -self.vy + random.uniform(-20, 20)
+            return
+
+        self.x = new_x
+        self.y = new_y
