@@ -6,13 +6,14 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 import config as cfg
 import random
+from utils.math_helpers import distance_sq
 
 class State(Enum):
     """Состояния конечного автомата существа."""
-    WANDER = auto()
-    SEEK = auto()
-    FLEE = auto()
-    REPRODUCE = auto()
+    WANDER = auto() # Рандомное движение
+    SEEK = auto() # Активный поиск
+    FLEE = auto() # Паника/поиск еды
+    REPRODUCE = auto() # Сытость
 
 @dataclass
 class Creature:
@@ -27,14 +28,14 @@ class Creature:
     # Гены будут использоваться позже для перцептрона и ген. алг-ма.
     genome: list[float] = field(default_factory=lambda: [0.0] * 8)
 
-    def update(self, dt: float) -> bool:
+    def update(self, dt: float, visible_food: list[tuple[float, float, float]]) -> bool:
         """Обновляет параметры существа за кадр. Возвращает False, если энергия <= 0."""
         self.energy -= cfg.ENERGY_DECAY * dt
         if self.energy <= 0:
             return False
 
         self._update_state()
-        self._apply_movement(dt)
+        self._apply_movement(dt, visible_food)  # ← передаём visible_food
         self._clamp_to_bounds()
         return True
 
@@ -53,31 +54,61 @@ class Creature:
             # Нормальное состояние 15-30 — спокойное блуждание
             self.state = State.WANDER
 
-    def _apply_movement(self, dt: float) -> None:
-        """Применяет скорость к координатам. Добавляет небольшой случайный импульс."""
-        # Базовый случайный импульс для всех состояний, чтобы не застревать на 0
-        self.vx += random.uniform(-0.5, 0.5)
-        self.vy += random.uniform(-0.5, 0.5)
-        
-        # Дополнительные поведения по состояниям
-        if self.state == State.WANDER:
-            self.vx += random.uniform(-1.5, 1.5)
-            self.vy += random.uniform(-1.5, 1.5)
-        elif self.state == State.FLEE:
-            self.vx *= 1.1
-            self.vy *= 1.1
-        elif self.state == State.REPRODUCE:
-            # Медленное блуждание при размножении
-            self.vx += random.uniform(-0.3, 0.3)
-            self.vy += random.uniform(-0.3, 0.3)
+    def _apply_movement(self, dt: float, visible_food: list[tuple[float, float, float]]) -> None:
+        """Применяет силы управления к скорости существа (Steering Behaviors)."""
+        from src.algorithms import steering
 
-        # Ограничиваем максимальную скорость
+        force_x, force_y = 0.0, 0.0
+
+        # Рассчитываем силу в зависимости от состояния FSM
+        if self.state == State.SEEK and visible_food:
+            closest_food_pos = None
+            min_dist = float('inf')
+            for fx, fy, _ in visible_food:
+                dist_sq = (self.x - fx) ** 2 + (self.y - fy) ** 2
+                if dist_sq < min_dist:
+                    min_dist = dist_sq
+                    closest_food_pos = (fx, fy)
+
+            if closest_food_pos is not None:
+                fx, fy = steering.seek(
+                    (self.x, self.y), closest_food_pos, cfg.SEEK_SPEED, (self.vx, self.vy)
+                )
+                force_x += fx
+                force_y += fy
+
+        elif self.state == State.WANDER:
+            force_x = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
+            force_y = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
+
+        elif self.state == State.FLEE:
+            # Паника: резкое ускорение в случайном направлении
+            angle = random.uniform(0, math.pi * 2)
+            force_x = math.cos(angle) * cfg.SEEK_SPEED
+            force_y = math.sin(angle) * cfg.SEEK_SPEED
+
+        elif self.state == State.REPRODUCE:
+            force_x = random.uniform(-5.0, 5.0)
+            force_y = random.uniform(-5.0, 5.0)
+
+        # Ограничиваем силу поворота/ускорения (MAX_STEERING_FORCE)
+        force_len = (force_x ** 2 + force_y ** 2) ** 0.5
+        if force_len > cfg.MAX_STEERING_FORCE:
+            force_x = (force_x / force_len) * cfg.MAX_STEERING_FORCE
+            force_y = (force_y / force_len) * cfg.MAX_STEERING_FORCE
+
+        # Интегрируем силу в скорость (физика: v += a * dt)
+        self.vx += force_x * dt
+        self.vy += force_y * dt
+
+        # Ограничиваем максимальную скорость (не зависит от силы)
         max_speed = 150.0
         current_speed = (self.vx ** 2 + self.vy ** 2) ** 0.5
         if current_speed > max_speed:
             self.vx = (self.vx / current_speed) * max_speed
             self.vy = (self.vy / current_speed) * max_speed
 
+        # Обновляем позицию
         self.x += self.vx * dt
         self.y += self.vy * dt
 

@@ -42,7 +42,6 @@ class GameLoop:
             self._update(dt)
             self._render()
             
-            self.clock.tick(cfg.FPS)
             
         pygame.quit()
 

@@ -26,8 +26,24 @@ class Renderer:
             color = STATE_COLORS.get(data["state"], (255, 255, 255))
             pygame.draw.circle(self.screen, color, data["pos"], data["radius"])
 
+
+        for food_x, food_y, _ in world.food:
+            # Маленькая зелёная точка, радиус 4
+            pygame.draw.circle(
+                self.screen,
+                (0, 255, 0),  # ярко-зелёный
+                (int(food_x), int(food_y)),
+                4  # радиус еды меньше, чем у существ (6)
+            )
         # Отладочная инфа в углу экрана
         if hasattr(world, 'get_creature_count'):
             font = pygame.font.SysFont("consolas", 12)
             text = f"Creatures: {world.get_creature_count()}"
             self.screen.blit(font.render(text, True, (200, 200, 200)), (10, 10))
+        
+        # отладка
+        if cfg.DEBUG_MODE:
+            for c in world.creatures:
+                start_pos = (int(c.x), int(c.y))
+                end_pos = (int(c.x + c.vx * 2), int(c.y + c.vy * 2))  # масштаб x2 для видимости
+                pygame.draw.line(self.screen, (255, 255, 0), start_pos, end_pos, 1)
