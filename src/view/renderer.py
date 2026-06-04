@@ -27,6 +27,12 @@ class Renderer:
             color = STATE_COLORS.get(data["state"], (255, 255, 255))
             pygame.draw.circle(self.screen, color, data["pos"], data["radius"])
 
+            # Отрисовка препятствий ← ДОБАВИТЬ
+        for ox, oy in world.get_obstacles():
+            # Рисуем квадрат 20x20 пикселей (размер клетки A*)
+            rect = pygame.Rect(int(ox) - 10, int(oy) - 10, 20, 20)
+            pygame.draw.rect(self.screen, (128, 128, 128), rect)  # Серый цвет
+
 
         for food_x, food_y, _ in world.food:
             # Маленькая зелёная точка, радиус 4
@@ -46,5 +52,12 @@ class Renderer:
         if cfg.DEBUG_MODE:
             for c in world.creatures:
                 start_pos = (int(c.x), int(c.y))
-                end_pos = (int(c.x + c.vx * 2), int(c.y + c.vy * 2))  # масштаб x2 для видимости
+                end_pos = (int(c.x + c.vx * 2), int(c.y + c.vy * 2))
                 pygame.draw.line(self.screen, (255, 255, 0), start_pos, end_pos, 1)
+
+                # Отрисовка пути A* (только если путь длинный и полезный)
+                if c.current_path and len(c.current_path) > 2:
+                    for i in range(len(c.current_path) - 1):
+                        p1 = (int(c.current_path[i][0]), int(c.current_path[i][1]))
+                        p2 = (int(c.current_path[i+1][0]), int(c.current_path[i+1][1]))
+                        pygame.draw.line(self.screen, (0, 255, 255), p1, p2, 2)
