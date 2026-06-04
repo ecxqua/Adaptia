@@ -7,6 +7,7 @@ from enum import Enum, auto
 import config as cfg
 import random
 from utils.math_helpers import distance_sq
+import math
 
 class State(Enum):
     """Состояния конечного автомата существа."""
@@ -23,6 +24,7 @@ class Creature:
     vx: float = 0.0
     vy: float = 0.0
     energy: float = 50.0
+    age: float = 0.0
     radius: float = 6.0
     state: State = State.WANDER
     # Гены будут использоваться позже для перцептрона и ген. алг-ма.
@@ -35,8 +37,9 @@ class Creature:
             return False
 
         self._update_state()
-        self._apply_movement(dt, visible_food)  # ← передаём visible_food
+        self._apply_movement(dt, visible_food)  # передаём visible_food
         self._clamp_to_bounds()
+        self.age += dt  # Считаем время выживания
         return True
 
     def _update_state(self) -> None:

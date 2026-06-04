@@ -5,6 +5,7 @@
 """
 import pygame
 from src.model.world import World
+import config as cfg
 
 # Цвета для визуализации состояний (R, G, B)
 STATE_COLORS = {
@@ -35,11 +36,11 @@ class Renderer:
                 (int(food_x), int(food_y)),
                 4  # радиус еды меньше, чем у существ (6)
             )
-        # Отладочная инфа в углу экрана
-        if hasattr(world, 'get_creature_count'):
-            font = pygame.font.SysFont("consolas", 12)
-            text = f"Creatures: {world.get_creature_count()}"
-            self.screen.blit(font.render(text, True, (200, 200, 200)), (10, 10))
+        # # Отладочная инфа в углу экрана
+        # if hasattr(world, 'get_creature_count'):
+        #     font = pygame.font.SysFont("consolas", 12)
+        #     text = f"Creatures: {world.get_creature_count()}"
+        #     self.screen.blit(font.render(text, True, (200, 200, 200)), (10, 10))
         
         # отладка
         if cfg.DEBUG_MODE:

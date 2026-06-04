@@ -7,6 +7,7 @@ import config as cfg
 from src.model.creature import Creature
 from utils.collision import check_circle_collision
 from src.algorithms.spatial_grid import SpatialGrid
+from src.model.population import Population
 
 class World:
     """Контейнер симуляции. Содержит все активные объекты."""
@@ -14,6 +15,10 @@ class World:
         self.creatures: list[Creature] = []
         self.food: list[tuple[float, float, float]] = []
         self.grid = SpatialGrid(cell_size=50.0)
+         
+        self.population_manager = Population(self.creatures)
+        self.evolution_timer = 0.0                           
+        
         self._spawn_initial_population()
 
     def update(self, dt: float) -> None:
@@ -36,6 +41,20 @@ class World:
         self.creatures = alive_creatures
 
         self._check_eating()
+
+        #  ЭВОЛЮЦИЯ
+        self.evolution_timer += dt
+        
+        # Эволюция только если есть живые существа И прошло время
+        if self.evolution_timer > 15.0 and len(self.creatures) > 0:
+            self.creatures = self.population_manager.next_generation()
+            self.evolution_timer = 0.0
+
+            # Безопасный вывод
+            hist = self.population_manager.best_fitness_history
+            gen = self.population_manager.generation
+            fit_str = f"{hist[-1]:.2f}" if hist else "N/A"
+            print(f"[GEN {gen}] Fitness: {fit_str}")
 
     def _spawn_initial_population(self) -> None:
         """Создаёт стартовую популяцию в случайных позициях с отступом от краёв."""
@@ -68,4 +87,10 @@ class World:
                         c.energy += fe
                         eaten_ids.add(id(item))
         self.food = [f for f in self.food if id(f) not in eaten_ids]
+    
+    def spawn_food_at(self, x: float, y: float) -> None:
+        """Создаёт еду в указанных координатах. Вызывается из Controller."""
+        self.food.append((x, y, 15.0))
+
+    def spawn_obstacle_at(self, x: float, y: float) -> None: ...  # заглушка
     
