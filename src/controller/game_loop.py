@@ -5,7 +5,7 @@ import config as cfg
 from src.model.world import World
 from src.view.renderer import Renderer
 from enum import Enum, auto
-from src.view.ui import UIManager
+from src.view.ui import UIManager, SettingsPanel
 
 class GameMode(Enum):
     MENU = auto()
@@ -38,6 +38,11 @@ class GameLoop:
         self.speed_multiplier = 1.0           # Множитель времени
 
         self.ui = UIManager(self.screen)
+
+        self.settings_panel = SettingsPanel(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT) # Добавили
+
+        self.ui_manager = UIManager(self.screen)
+        self.settings_panel = SettingsPanel(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
     
     def run(self) -> None:
         """Запускает основной игровой цикл.
@@ -61,7 +66,10 @@ class GameLoop:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            
+
+            if self.settings_panel.handle_event(event):
+                continue  # Если ползунок "съел" клик, дальше не обрабатываем   
+                     
             # Обработка клавиш
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -73,6 +81,8 @@ class GameLoop:
                         self.speed_multiplier = 2.0
                     elif event.key == pygame.K_5:
                         self.speed_multiplier = 5.0
+                    elif event.key == pygame.K_s:
+                        self.settings_panel.toggle() # Открыть/закрыть настройки
 
             # Обработка мыши 
             elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -96,14 +106,18 @@ class GameLoop:
         self.world.update(effective_dt)
 
     def _render(self) -> None:
-        """Отрисовывает текущее состояние мира на экран."""
-        # Очистка экрана перед отрисовкой предотвращает артефакты.
-        # Цвет фона (20, 20, 25) соответствует минималистичному стилю ТЗ.
-        self.screen.fill((20, 20, 25))
-        self.renderer.draw_world(self.world)
+        self.screen.fill((20, 20, 25)) # Фон
         
-        # HUD рисуется поверх мира
-        mode_name = self.mode.name if self.mode else "UNKNOWN"
-        self.ui.draw_hud(self.world.get_creature_count(), mode_name, self.speed_multiplier)
+        self.renderer.draw_world(self.world) # Мир
+        
+        # HUD (счетчики)
+        self.ui_manager.draw_hud(
+            self.world.get_creature_count(),
+            self.mode.name,
+            self.speed_multiplier
+        )
+        
+        # Панель настроек (рисуется поверх всего)
+        self.settings_panel.draw(self.screen)
         
         pygame.display.flip()

@@ -17,21 +17,20 @@ class World:
         self.food: list[tuple[float, float, float]] = []
         self.grid = SpatialGrid(cell_size=50.0)
         self.obstacles: list[tuple[float, float]] = []
-        self.population_manager = Population(self.creatures, self.pathfinder)
         self.evolution_timer = 0.0
 
-        self._spawn_initial_population()
-
-        # Инициализация A* навигации
+        # ✅ СНАЧАЛА создаём pathfinder (он нужен для спавна и Population)
         self.pathfinder = AStarPathfinder(
             grid_width=cfg.GRID_WIDTH,
             grid_height=cfg.GRID_HEIGHT,
             cell_size=cfg.GRID_CELL_SIZE
         )
 
-        # Передаём pathfinder всем начальным существам
-        for c in self.creatures:
-            c._pathfinder = self.pathfinder
+        # ✅ ПОТОМ спавним популяцию (использует pathfinder для проверки препятствий)
+        self._spawn_initial_population()
+
+        # ✅ И ТОЛЬКО ПОТОМ создаём Population, передавая ей pathfinder
+        self.population_manager = Population(self.creatures, self.pathfinder)
 
     def spawn_obstacle_at(self, x: float, y: float) -> None:
         """Создаёт препятствие в указанных координатах (для A* и рендера)."""
