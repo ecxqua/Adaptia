@@ -3,7 +3,7 @@
 """
 import random
 import config as cfg
-from src.model.creature import Creature
+from src.model.creature import Creature, State
 from utils.collision import check_circle_collision
 from src.algorithms.spatial_grid import SpatialGrid
 from src.model.population import Population
@@ -70,7 +70,8 @@ class World:
 
         self._check_eating()
 
-        # Создание потомка
+        # Создание потомка (размножение)
+        new_children = []  # Собираем потомков отдельно, чтобы не ломать итерацию
         for i, c1 in enumerate(self.creatures):
             if c1.state != State.REPRODUCE or c1.energy < 40:
                 continue
@@ -79,13 +80,20 @@ class World:
                     if check_circle_collision((c1.x, c1.y), c1.radius, (c2.x, c2.y), c2.radius):
                         # Создаем потомка
                         child_genome = ga.crossover(c1.genome, c2.genome)
-                        child_genome = ga.mutate(child_genome, 0.1, 0.2)
-                        child = Creature(x=(c1.x+c2.x)/2, y=(c1.y+c2.y)/2, genome=child_genome)
+                        child_genome = ga.mutate(child_genome, cfg.MUTATION_RATE, cfg.MUTATION_STRENGTH)
+                        child = Creature(
+                            x=(c1.x + c2.x) / 2, 
+                            y=(c1.y + c2.y) / 2, 
+                            genome=child_genome
+                        )
                         child._pathfinder = self.pathfinder
-                        self.creatures.append(child)
+                        new_children.append(child)
                         c1.energy -= 20  # Родители тратят энергию
                         c2.energy -= 20
-                        break
+                        break  # Один потомок за раз
+        
+        # Добавляем всех потомков после цикла
+        self.creatures.extend(new_children)
 
         for p in self.particles:
             p['x'] += p['vx'] * dt

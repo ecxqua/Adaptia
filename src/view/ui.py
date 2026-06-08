@@ -3,7 +3,7 @@
 """
 import pygame
 import config as cfg
-from typing import List, Callable, Tuple
+from typing import List, Callable, Tuple, Optional
 
 
 class UIManager:
@@ -181,3 +181,68 @@ class SettingsPanel:
         
         for slider in self.sliders:
             slider.draw(surface)
+
+class MainMenu:
+    """Главное меню. Отвечает за отрисовку кнопок и обработку кликов."""
+    def __init__(self, screen_width: float, screen_height: float):
+        self.visible = True
+        self.width = 420
+        self.height = 320
+        self.x = (screen_width - self.width) / 2
+        self.y = (screen_height - self.height) / 2 - 40
+
+        self.buttons = [
+            {"text": "Запуск", "action": "start", "y": 40},
+            {"text": "Настройки", "action": "settings", "y": 100},
+            {"text": "Статистика", "action": "stats", "y": 160},
+            {"text": "Выход", "action": "exit", "y": 220},
+        ]
+        self.hovered_index = -1
+        self.font_title = pygame.font.SysFont("consolas", 32, bold=True)
+        self.font_btn = pygame.font.SysFont("consolas", 20)
+
+    def handle_event(self, event: pygame.event.Event) -> Optional[str]:
+        """Возвращает строку-действие при клике или None."""
+        if not self.visible:
+            return None
+        if event.type == pygame.MOUSEMOTION:
+            mx, my = event.pos
+            self.hovered_index = -1
+            for i, btn in enumerate(self.buttons):
+                btn_rect = pygame.Rect(self.x + 60, self.y + btn["y"], self.width - 120, 44)
+                if btn_rect.collidepoint(mx, my):
+                    self.hovered_index = i
+                    break
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            for btn in self.buttons:
+                btn_rect = pygame.Rect(self.x + 60, self.y + btn["y"], self.width - 120, 44)
+                if btn_rect.collidepoint(mx, my):
+                    return btn["action"]
+        return None
+
+    def draw(self, surface: pygame.Surface) -> None:
+        if not self.visible:
+            return
+        # Затемнение фона
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill((15, 15, 20, 200))
+        surface.blit(overlay, (0, 0))
+
+        # Окно меню
+        pygame.draw.rect(surface, (25, 25, 35), (self.x, self.y, self.width, self.height), border_radius=12)
+        pygame.draw.rect(surface, (80, 80, 100), (self.x, self.y, self.width, self.height), 2, border_radius=12)
+
+        title = self.font_title.render("Adaptia", True, (240, 240, 240))
+        surface.blit(title, (self.x + (self.width - title.get_width()) / 2, self.y + 15))
+
+        for i, btn in enumerate(self.buttons):
+            btn_rect = pygame.Rect(self.x + 60, self.y + btn["y"], self.width - 120, 44)
+            color = (50, 100, 50) if i == self.hovered_index else (35, 35, 45)
+            pygame.draw.rect(surface, color, btn_rect, border_radius=8)
+            if i == self.hovered_index:
+                pygame.draw.rect(surface, (70, 130, 70), btn_rect, 2, border_radius=8)
+
+            text_surf = self.font_btn.render(btn["text"], True, (220, 220, 220))
+            surface.blit(text_surf, (btn_rect.centerx - text_surf.get_width() / 2,
+                                     btn_rect.centery - text_surf.get_height() / 2))            

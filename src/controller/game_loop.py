@@ -5,7 +5,7 @@ import config as cfg
 from src.model.world import World
 from src.view.renderer import Renderer
 from enum import Enum, auto
-from src.view.ui import UIManager, SettingsPanel
+from src.view.ui import UIManager, SettingsPanel, MainMenu
 
 class GameMode(Enum):
     MENU = auto()
@@ -43,6 +43,9 @@ class GameLoop:
 
         self.ui_manager = UIManager(self.screen)
         self.settings_panel = SettingsPanel(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
+
+        self.mode = GameMode.MENU  # Стартуем с меню
+        self.main_menu = MainMenu(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
     
     def run(self) -> None:
         """Запускает основной игровой цикл.
@@ -66,11 +69,27 @@ class GameLoop:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+                continue  # Выходим из текущей итерации цикла
 
+            # 1. Сначала обрабатываем события меню
+            if self.mode == GameMode.MENU:
+                action = self.main_menu.handle_event(event)
+                if action == "start":
+                    self.mode = GameMode.RUNNING
+                    self.main_menu.visible = False
+                elif action == "settings":
+                    self.settings_panel.toggle()
+                elif action == "stats":
+                    print("[INFO] Статистика будет доступна после недели 7 (график + CSV)")
+                elif action == "exit":
+                    self.running = False
+                continue  # Если меню активно, остальные события не обрабатываем
+
+            # 2. События панели настроек
             if self.settings_panel.handle_event(event):
-                continue  # Если ползунок "съел" клик, дальше не обрабатываем   
-                     
-            # Обработка клавиш
+                continue  # Если ползунок "съел" клик, дальше не обрабатываем
+
+            # 3. Обработка клавиш
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.mode = GameMode.PAUSED if self.mode == GameMode.RUNNING else GameMode.RUNNING
@@ -82,9 +101,9 @@ class GameLoop:
                     elif event.key == pygame.K_5:
                         self.speed_multiplier = 5.0
                     elif event.key == pygame.K_s:
-                        self.settings_panel.toggle() # Открыть/закрыть настройки
+                        self.settings_panel.toggle()  # Открыть/закрыть настройки
 
-            # Обработка мыши 
+            # 4. Обработка мыши
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
                 if event.button == 1:  # ЛКМ = еда
@@ -109,15 +128,18 @@ class GameLoop:
         self.screen.fill((20, 20, 25)) # Фон
         
         self.renderer.draw_world(self.world) # Мир
-        
         # HUD (счетчики)
         self.ui_manager.draw_hud(
             self.world.get_creature_count(),
             self.mode.name,
             self.speed_multiplier
         )
-        
+
+        if self.mode == GameMode.MENU:
+            self.main_menu.draw(self.screen)
         # Панель настроек (рисуется поверх всего)
         self.settings_panel.draw(self.screen)
         
+
+
         pygame.display.flip()
