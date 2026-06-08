@@ -18,18 +18,18 @@ class World:
         self.grid = SpatialGrid(cell_size=50.0)
         self.obstacles: list[tuple[float, float]] = []
         self.evolution_timer = 0.0
+        self.particles: list[dict] = []
 
-        # ✅ СНАЧАЛА создаём pathfinder (он нужен для спавна и Population)
+        # создаём pathfinder (он нужен для спавна и Population)
         self.pathfinder = AStarPathfinder(
             grid_width=cfg.GRID_WIDTH,
             grid_height=cfg.GRID_HEIGHT,
             cell_size=cfg.GRID_CELL_SIZE
         )
 
-        # ✅ ПОТОМ спавним популяцию (использует pathfinder для проверки препятствий)
+        # спавним популяцию 
         self._spawn_initial_population()
 
-        # ✅ И ТОЛЬКО ПОТОМ создаём Population, передавая ей pathfinder
         self.population_manager = Population(self.creatures, self.pathfinder)
 
     def spawn_obstacle_at(self, x: float, y: float) -> None:
@@ -69,6 +69,29 @@ class World:
         self.creatures = alive_creatures
 
         self._check_eating()
+
+        # Создание потомка
+        for i, c1 in enumerate(self.creatures):
+            if c1.state != State.REPRODUCE or c1.energy < 40:
+                continue
+            for c2 in self.creatures[i+1:]:
+                if c2.state == State.REPRODUCE and c2.energy > 40:
+                    if check_circle_collision((c1.x, c1.y), c1.radius, (c2.x, c2.y), c2.radius):
+                        # Создаем потомка
+                        child_genome = ga.crossover(c1.genome, c2.genome)
+                        child_genome = ga.mutate(child_genome, 0.1, 0.2)
+                        child = Creature(x=(c1.x+c2.x)/2, y=(c1.y+c2.y)/2, genome=child_genome)
+                        child._pathfinder = self.pathfinder
+                        self.creatures.append(child)
+                        c1.energy -= 20  # Родители тратят энергию
+                        c2.energy -= 20
+                        break
+
+        for p in self.particles:
+            p['x'] += p['vx'] * dt
+            p['y'] += p['vy'] * dt
+            p['life'] -= dt * 2  # Затухание за 0.5 сек
+        self.particles = [p for p in self.particles if p['life'] > 0]
 
         # Эволюция
         self.evolution_timer += dt
@@ -122,6 +145,15 @@ class World:
                     fx, fy, fe = item
                     if check_circle_collision((c.x, c.y), c.radius, (fx, fy), 4.0):
                         c.energy += fe
+                        # Создаём частицы
+                        for _ in range(5):
+                            self.particles.append({
+                                'x': fx, 'y': fy,
+                                'vx': random.uniform(-30, 30),
+                                'vy': random.uniform(-30, 30),
+                                'life': 1.0,
+                                'color': (100, 255, 100)
+                            })
                         eaten_ids.add(id(item))
         self.food = [f for f in self.food if id(f) not in eaten_ids]
 

@@ -44,6 +44,8 @@ class Creature:
     # Поле для перцептрона. repr=False скрывает объект мозга при отладке print()
     brain: Optional[SimplePerceptron] = field(default=None, repr=False)
 
+    trail: list[tuple[float, float]] = field(default_factory=list, repr=False)
+
     def __post_init__(self) -> None:
         """Инициализирует мозг из генома. Первые 7 генов → веса, последний → bias."""
         if self.brain is None:
@@ -134,6 +136,10 @@ class Creature:
 
         self._clamp_to_bounds()
         self.age += dt
+        # Сохраняем позицию в след (максимум 20 точек)
+        self.trail.append((self.x, self.y))
+        if len(self.trail) > 20:
+            self.trail.pop(0)
         return True
 
     def _check_obstacle_collision(self, new_x: float, new_y: float) -> bool:

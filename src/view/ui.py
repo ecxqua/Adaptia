@@ -18,10 +18,10 @@ class UIManager:
             f"Существа: {creature_count}",
             f"Режим: {mode_name}",
             f"Скорость: x{speed:.1f}",
-            f"Мутация: {cfg.MUTATION_RATE:.2f}",           # ← ДОБАВИТЬ
-            f"Сила мутации: {cfg.MUTATION_STRENGTH:.2f}",  # ← ДОБАВИТЬ
-            f"Плотность еды: {cfg.FOOD_SPAWN_RATE:.3f}",   # ← ДОБАВИТЬ
-            f"Расход энергии: {cfg.ENERGY_DECAY:.1f}",     # ← ДОБАВИТЬ
+            f"Мутация: {cfg.MUTATION_RATE:.2f}",           
+            f"Сила мутации: {cfg.MUTATION_STRENGTH:.2f}",  
+            f"Плотность еды: {cfg.FOOD_SPAWN_RATE:.3f}",  
+            f"Расход энергии: {cfg.ENERGY_DECAY:.1f}",     
         ]
         y_offset = 10
         for text in lines:
