@@ -1,17 +1,19 @@
 # src/controller/game_loop.py
 import pygame
 import config as cfg
-
+import csv
+import os
 from src.model.world import World
 from src.view.renderer import Renderer
 from enum import Enum, auto
-from src.view.ui import UIManager, SettingsPanel, MainMenu
+from src.view.ui import UIManager, SettingsPanel, MainMenu, FitnessGraph, GeneHistogram, StatsScreen, PauseOverlay
 
 class GameMode(Enum):
     MENU = auto()
     RUNNING = auto()
     PAUSED = auto()
     SETTINGS = auto()
+    STATS = auto() 
 
 class GameLoop:
     """Контроллер игрового цикла.
@@ -46,6 +48,12 @@ class GameLoop:
 
         self.mode = GameMode.MENU  # Стартуем с меню
         self.main_menu = MainMenu(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
+        self.pause_overlay = PauseOverlay(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT) 
+
+        # Графики статистики
+        self.fitness_graph = FitnessGraph(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
+        self.gene_histogram = GeneHistogram(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
+        self.stats_screen = StatsScreen(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
     
     def run(self) -> None:
         """Запускает основной игровой цикл.
@@ -69,9 +77,9 @@ class GameLoop:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-                continue  # Выходим из текущей итерации цикла
+                continue
 
-            # 1. Сначала обрабатываем события меню
+            # 1. Главное меню (старт игры)
             if self.mode == GameMode.MENU:
                 action = self.main_menu.handle_event(event)
                 if action == "start":
@@ -80,35 +88,61 @@ class GameLoop:
                 elif action == "settings":
                     self.settings_panel.toggle()
                 elif action == "stats":
-                    print("[INFO] Статистика будет доступна после недели 7 (график + CSV)")
+                    self.mode = GameMode.STATS
+                    self.main_menu.visible = False
                 elif action == "exit":
                     self.running = False
-                continue  # Если меню активно, остальные события не обрабатываем
+                continue
 
-            # 2. События панели настроек
+            # 2. Экран паузы (во время игры)
+            if self.mode == GameMode.PAUSED:
+                action = self.pause_overlay.handle_event(event)
+                if action == "resume":
+                    self.mode = GameMode.RUNNING
+                    self.pause_overlay.visible = False
+                elif action == "stats":
+                    self.mode = GameMode.STATS
+                    self.pause_overlay.visible = False
+                elif action == "settings":
+                    self.settings_panel.toggle()
+                elif action == "menu":
+                    self.mode = GameMode.MENU
+                    self.main_menu.visible = True
+                    self.pause_overlay.visible = False
+                continue
+
+            # 3. Панель настроек (работает всегда, кроме MENU)
             if self.settings_panel.handle_event(event):
-                continue  # Если ползунок "съел" клик, дальше не обрабатываем
+                continue
 
-            # 3. Обработка клавиш
+            # 4. Горячие клавиши
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.mode = GameMode.PAUSED if self.mode == GameMode.RUNNING else GameMode.RUNNING
+                    if self.mode == GameMode.RUNNING:
+                        self.mode = GameMode.PAUSED
+                        self.pause_overlay.visible = True
+                    elif self.mode == GameMode.PAUSED:
+                        self.mode = GameMode.RUNNING
+                        self.pause_overlay.visible = False
+                    elif self.mode == GameMode.STATS:
+                        self.mode = GameMode.PAUSED
+                        self.pause_overlay.visible = True
+                elif event.key == pygame.K_c:
+                    self._export_stats()
+                elif event.key == pygame.K_g:
+                    self.fitness_graph.visible = not self.fitness_graph.visible
+                    self.gene_histogram.visible = not self.gene_histogram.visible
                 elif self.mode == GameMode.RUNNING:
-                    if event.key == pygame.K_1:
-                        self.speed_multiplier = 1.0
-                    elif event.key == pygame.K_2:
-                        self.speed_multiplier = 2.0
-                    elif event.key == pygame.K_5:
-                        self.speed_multiplier = 5.0
-                    elif event.key == pygame.K_s:
-                        self.settings_panel.toggle()  # Открыть/закрыть настройки
+                    if event.key == pygame.K_1: self.speed_multiplier = 1.0
+                    elif event.key == pygame.K_2: self.speed_multiplier = 2.0
+                    elif event.key == pygame.K_5: self.speed_multiplier = 5.0
 
-            # 4. Обработка мыши
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            # 5. Мышь (спавн еды/препятствий)
+            elif event.type == pygame.MOUSEBUTTONDOWN and self.mode == GameMode.RUNNING:
                 x, y = event.pos
-                if event.button == 1:  # ЛКМ = еда
+                if event.button == 1:
                     self.world.spawn_food_at(x, y)
-                elif event.button == 3:  # ПКМ = препятствие
+                elif event.button == 3:
                     self.world.spawn_obstacle_at(x, y)
 
     def _update(self, dt: float) -> None:
@@ -125,21 +159,53 @@ class GameLoop:
         self.world.update(effective_dt)
 
     def _render(self) -> None:
-        self.screen.fill((20, 20, 25)) # Фон
+        self.screen.fill((20, 20, 25))
         
-        self.renderer.draw_world(self.world) # Мир
-        # HUD (счетчики)
-        self.ui_manager.draw_hud(
-            self.world.get_creature_count(),
-            self.mode.name,
-            self.speed_multiplier
-        )
-
-        if self.mode == GameMode.MENU:
-            self.main_menu.draw(self.screen)
-        # Панель настроек (рисуется поверх всего)
+        self.renderer.draw_world(self.world)
+        
+        # HUD
+        self.ui_manager.draw_hud(self.world.get_creature_count(), self.mode.name, self.speed_multiplier)
+        
+        # Мини-графики в углу (только в RUNNING/PAUSED)
+        if self.mode in (GameMode.RUNNING, GameMode.PAUSED) and self.world.population_manager.best_fitness_history:
+            self.fitness_graph.draw(self.screen, self.world.population_manager.best_fitness_history, self.world.population_manager.generation)
+            self.gene_histogram.draw(self.screen, self.world.creatures)
+        
+        # Полноэкранный режим статистики
+        if self.mode == GameMode.STATS:
+            self.stats_screen.draw(self.screen, self.world.population_manager.best_fitness_history, self.world.population_manager.generation, self.world.creatures)
+        
+        # Панель настроек
         self.settings_panel.draw(self.screen)
         
-
+        # Главное меню
+        if self.mode == GameMode.MENU:
+            self.main_menu.draw(self.screen)
+            
+        # Экран паузы
+        if self.mode == GameMode.PAUSED:
+            self.pause_overlay.draw(self.screen)
 
         pygame.display.flip()
+    
+    def _export_stats(self) -> None:
+        """Экспортирует статистику в CSV файл."""
+        filename = f"stats_gen{self.world.population_manager.generation}.csv"
+        try:
+            with open(filename, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(["Поколение", "Лучший фитнес", "Мутация", "Плотность еды", "Расход энергии"])
+                
+                history = self.world.population_manager.best_fitness_history
+                for i, fit in enumerate(history):
+                    writer.writerow([
+                        i + 1,
+                        f"{fit:.2f}",
+                        cfg.MUTATION_RATE,
+                        cfg.FOOD_SPAWN_RATE,
+                        cfg.ENERGY_DECAY
+                    ])
+            
+            print(f"[INFO] Статистика экспортирована в {filename}")
+        except Exception as e:
+            print(f"[ERROR] Не удалось экспортировать статистику: {e}")
