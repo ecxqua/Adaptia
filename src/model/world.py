@@ -103,7 +103,7 @@ class World:
 
         # Эволюция
         self.evolution_timer += dt
-        if self.evolution_timer > 15.0 and len(self.creatures) > 0:
+        if self.evolution_timer > cfg.GENERATION_TIME and len(self.creatures) > 0:
             self.creatures = self.population_manager.next_generation()
             self.evolution_timer = 0.0
 

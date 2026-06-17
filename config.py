@@ -14,6 +14,7 @@ ENERGY_DECAY: Final[float] = 1.0      # потеря энергии за кад�
 ENERGY_THRESHOLD: Final[float] = 40.0  # мин. энергия для размножения
 SEEK_SPEED: Final[float] = 80.0          # Скорость движения к еде
 PERCEPTION_RADIUS: Final[float] = 100.0  # Радиус "зрения" существа
+GENERATION_TIME: float = 15.0  # секунд
 
 # ГА
 POPULATION_SIZE: Final[int] = 20      # Размер популяции

@@ -130,6 +130,10 @@ class Creature:
                 else:
                     # Путь не найден → блуждаем
                     self._apply_wander(dt)
+        # Если в SEEK но нет еды → переключаемся в WANDER
+        elif self.state == State.SEEK and not visible_food:
+            self.state = State.WANDER  # ← Нет цели, блуждаем случайно
+            self._apply_movement(dt, visible_food)        
         else:
             # Не SEEK → обычное поведение с проверкой препятствий
             self._apply_movement(dt, visible_food)
@@ -170,7 +174,23 @@ class Creature:
 
         force_x, force_y = 0.0, 0.0
 
-        if self.state == State.WANDER:
+        if self.state == State.SEEK and visible_food:
+            closest_food_pos = None
+            min_dist = float('inf')
+            for fx, fy, _ in visible_food:
+                dist_sq = (self.x - fx) ** 2 + (self.y - fy) ** 2
+                if dist_sq < min_dist:
+                    min_dist = dist_sq
+                    closest_food_pos = (fx, fy)
+
+            if closest_food_pos is not None:
+                fx, fy = steering.seek(
+                    (self.x, self.y), closest_food_pos, cfg.SEEK_SPEED, (self.vx, self.vy)
+                )
+                force_x += fx
+                force_y += fy
+
+        elif self.state == State.WANDER:
             force_x = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
             force_y = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
 
@@ -183,7 +203,7 @@ class Creature:
             force_x = random.uniform(-5.0, 5.0)
             force_y = random.uniform(-5.0, 5.0)
 
-        # Ограничиваем силу
+        # Ограничиваем силу поворота/ускорения
         force_len = (force_x ** 2 + force_y ** 2) ** 0.5
         if force_len > cfg.MAX_STEERING_FORCE:
             force_x = (force_x / force_len) * cfg.MAX_STEERING_FORCE
@@ -204,15 +224,12 @@ class Creature:
         new_x = self.x + self.vx * dt
         new_y = self.y + self.vy * dt
 
-        # Проверяем препятствия с помощью line sweep
+        # Проверка препятствий через line sweep
         if self._check_obstacle_collision(new_x, new_y):
-            # Препятствие! Разворачиваемся
             self.vx = -self.vx + random.uniform(-20, 20)
             self.vy = -self.vy + random.uniform(-20, 20)
-            # Не обновляем позицию
             return
 
-        # Обновляем позицию
         self.x = new_x
         self.y = new_y
 
