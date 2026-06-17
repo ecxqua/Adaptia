@@ -192,10 +192,9 @@ class MainMenu:
         self.y = (screen_height - self.height) / 2 - 40
 
         self.buttons = [
-            {"text": "Запуск", "action": "start", "y": 40},
-            {"text": "Настройки", "action": "settings", "y": 100},
-            {"text": "Статистика", "action": "stats", "y": 160},
-            {"text": "Выход", "action": "exit", "y": 220},
+            {"text": "Запуск", "action": "start", "y": 60},
+            {"text": "Статистика", "action": "stats", "y": 120},
+            {"text": "Выход", "action": "exit", "y": 180},
         ]
         self.hovered_index = -1
         self.font_title = pygame.font.SysFont("consolas", 32, bold=True)
@@ -250,8 +249,8 @@ class MainMenu:
 class FitnessGraph:
     """Отрисовка графика фитнеса по поколениям в правом верхнем углу."""
     def __init__(self, screen_width: float, screen_height: float):
-        self.width = 240   # ✅ Было 300, уменьшили
-        self.height = 120  # ✅ Было 150, уменьшили
+        self.width = 240   
+        self.height = 120  
         self.x = screen_width - self.width - 20
         self.y = 20
         self.font = pygame.font.SysFont("consolas", 11)
@@ -308,10 +307,9 @@ class FitnessGraph:
 class GeneHistogram:
     """Гистограмма среднего значения генов популяции (компактная)."""
     def __init__(self, screen_width: float, screen_height: float):
-        self.width = 240   # ✅ Совпадает с шириной FitnessGraph
-        self.height = 90   # ✅ Было 110, уменьшили
+        self.width = 240   
+        self.height = 90  
         self.x = screen_width - self.width - 20
-        # ✅ y = 20 (график) + 120 (высота графика) + 10 (отступ) = 150
         self.y = 150
         self.font = pygame.font.SysFont("consolas", 9)
         self.font_title = pygame.font.SysFont("consolas", 11, bold=True)
@@ -376,13 +374,12 @@ class StatsScreen:
         self.font_subtitle = pygame.font.SysFont("consolas", 18, bold=True)
         self.font_text = pygame.font.SysFont("consolas", 14)
         self.font_small = pygame.font.SysFont("consolas", 12)
-        
-        # ✅ УВЕЛИЧЕННЫЕ отступы, чтобы ничего не перекрывалось
+
         self.title_y = 30
-        self.subtitle_y = 70        # Подзаголовок
-        self.graph_y = 110          # ✅ Было 80, сдвинули вниз на 30px
-        self.histogram_y = 310      # ✅ Было 280, сдвинули вниз
-        self.table_y = 500          # ✅ Было 420, сдвинули вниз
+        self.subtitle_y = 70     
+        self.graph_y = 110       
+        self.histogram_y = 310      
+        self.table_y = 500         
 
     def draw(self, surface: pygame.Surface, fitness_history: list[float], 
              generation: int, creatures: list) -> None:
@@ -560,10 +557,9 @@ class PauseOverlay:
         self.y = (screen_height - self.height) / 2
         
         self.buttons = [
-            {"text": "Продолжить", "action": "resume", "y": 30},
-            {"text": "Статистика", "action": "stats", "y": 90},
-            {"text": "Настройки", "action": "settings", "y": 150},
-            {"text": "В главное меню", "action": "menu", "y": 210},
+            {"text": "Запуск", "action": "resume", "y": 60},
+            {"text": "Статистика", "action": "stats", "y": 120},
+            {"text": "Выход", "action": "exit", "y": 180},
         ]
         self.hovered_index = -1
         self.font_title = pygame.font.SysFont("consolas", 24, bold=True)

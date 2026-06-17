@@ -7,6 +7,7 @@ from src.model.world import World
 from src.view.renderer import Renderer
 from enum import Enum, auto
 from src.view.ui import UIManager, SettingsPanel, MainMenu, FitnessGraph, GeneHistogram, StatsScreen, PauseOverlay
+from utils.save_system import save_game, load_game
 
 class GameMode(Enum):
     MENU = auto()
@@ -127,6 +128,12 @@ class GameLoop:
                     elif self.mode == GameMode.STATS:
                         self.mode = GameMode.PAUSED
                         self.pause_overlay.visible = True
+                elif event.key == pygame.K_s:  # ← ДОБАВИТЬ: Открыть/закрыть настройки
+                    self.settings_panel.toggle()                
+                elif event.key == pygame.K_F5:  # Сохранение
+                    save_game(self.world)
+                elif event.key == pygame.K_F9:  # Загрузка
+                    load_game(self.world)                        
                 elif event.key == pygame.K_c:
                     self._export_stats()
                 elif event.key == pygame.K_g:
@@ -175,8 +182,6 @@ class GameLoop:
         if self.mode == GameMode.STATS:
             self.stats_screen.draw(self.screen, self.world.population_manager.best_fitness_history, self.world.population_manager.generation, self.world.creatures)
         
-        # Панель настроек
-        self.settings_panel.draw(self.screen)
         
         # Главное меню
         if self.mode == GameMode.MENU:
@@ -185,6 +190,8 @@ class GameLoop:
         # Экран паузы
         if self.mode == GameMode.PAUSED:
             self.pause_overlay.draw(self.screen)
+        
+        self.settings_panel.draw(self.screen)
 
         pygame.display.flip()
     
