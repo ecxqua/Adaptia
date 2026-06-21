@@ -55,19 +55,24 @@ class World:
         if random.random() < cfg.FOOD_SPAWN_RATE:
             self._spawn_food()
 
+        # Очищаем и заполняем сетку
         self.grid.clear()
+        
+        # Вставляем еду
         for f in self.food:
             self.grid.insert(f, (f[0], f[1]))
+        
+        # Вставляем существ 
+        for c in self.creatures:
+            self.grid.insert(c, (c.x, c.y))
 
+        # Теперь query_radius найдёт и еду, и существ
         alive_creatures = []
         for c in self.creatures:
             nearby = self.grid.query_radius((c.x, c.y), cfg.PERCEPTION_RADIUS)
             food_only = [item for item in nearby if isinstance(item, tuple) and len(item) == 3]
-
-            # Передаём список других существ для поиска партнера
             nearby_creatures = [item for item in nearby if isinstance(item, Creature)]
 
-            # Передаём pathfinder в update!
             if c.update(dt, food_only, self.pathfinder, nearby_creatures):
                 alive_creatures.append(c)
         self.creatures = alive_creatures

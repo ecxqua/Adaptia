@@ -102,10 +102,6 @@ class AStarPathfinder:
         start_grid = self.world_to_grid(start_x, start_y)
         goal_grid = self.world_to_grid(goal_x, goal_y)
 
-            # Отладка
-        print(f"[A*] Path request: ({start_x:.1f},{start_y:.1f}) → ({goal_x:.1f},{goal_y:.1f})")
-        print(f"[A*] Grid cells: {start_grid} → {goal_grid}")
-        print(f"[A*] Obstacles: {self.obstacles}")
         
         # Проверка: если старт или цель в препятствии
         if start_grid in self.obstacles or goal_grid in self.obstacles:

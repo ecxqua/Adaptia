@@ -30,6 +30,8 @@ class GameLoop:
         self.screen = pygame.display.set_mode((cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT))
         pygame.display.set_caption("Adaptia")
         
+        pygame.mixer.init() # музыка
+
         self.clock = pygame.time.Clock()
         self.running = True
         
@@ -55,6 +57,16 @@ class GameLoop:
         self.fitness_graph = FitnessGraph(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
         self.gene_histogram = GeneHistogram(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
         self.stats_screen = StatsScreen(cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT)
+
+        # ЗАГРУЗКА МУЗЫКИ (с защитой от падения, если файла нет)
+        self.is_music_playing = True
+        try:
+            pygame.mixer.music.load('music.mp3')  # Убедись, что файл в корне проекта!
+            pygame.mixer.music.set_volume(0.3)    # Громкость 30%
+            pygame.mixer.music.play(-1)           # -1 означает бесконечный цикл
+            print("[AUDIO] Музыка успешно загружена и запущена.")
+        except Exception as e:
+            print(f"[WARN] Не удалось загрузить музыку: {e}")
     
     def run(self) -> None:
         """Запускает основной игровой цикл.
@@ -128,17 +140,28 @@ class GameLoop:
                     elif self.mode == GameMode.STATS:
                         self.mode = GameMode.PAUSED
                         self.pause_overlay.visible = True
-                elif event.key == pygame.K_s:  # ← ДОБАВИТЬ: Открыть/закрыть настройки
+                
+                elif event.key == pygame.K_m:  # звук вкл/выкл
+                    self.is_music_playing = not self.is_music_playing
+                    if self.is_music_playing:
+                        pygame.mixer.music.unpause()
+                        print("[AUDIO] Музыка включена")
+                    else:
+                        pygame.mixer.music.pause()
+                        print("[AUDIO] Музыка выключена")
+                
+                elif event.key == pygame.K_s:
                     self.settings_panel.toggle()                
-                elif event.key == pygame.K_F5:  # Сохранение
+                elif event.key == pygame.K_F5:
                     save_game(self.world)
-                elif event.key == pygame.K_F9:  # Загрузка
+                elif event.key == pygame.K_F9:
                     load_game(self.world)                        
                 elif event.key == pygame.K_c:
                     self._export_stats()
                 elif event.key == pygame.K_g:
                     self.fitness_graph.visible = not self.fitness_graph.visible
                     self.gene_histogram.visible = not self.gene_histogram.visible
+                
                 elif self.mode == GameMode.RUNNING:
                     if event.key == pygame.K_1: self.speed_multiplier = 1.0
                     elif event.key == pygame.K_2: self.speed_multiplier = 2.0

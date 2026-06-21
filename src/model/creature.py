@@ -66,46 +66,66 @@ class Creature:
         if self.energy <= 0:
             return False
 
-        # Обновляем ссылку на pathfinder (на случай если не была установлена)
+        # Обновляем ссылку на pathfinder
         if pathfinder is not None:
             self._pathfinder = pathfinder
 
-        # Подготовка сенсоров (входы перцептрона)
-        food_signal = 1.0 if visible_food else 0.0
-        energy_signal = max(0.0, min(1.0, self.energy / 50.0))
-        sensors = [food_signal, energy_signal, 0.0, 0.0, 0.0, 0.0, 0.0]
-
-        # Запрос решения у перцептрона
-        decision = self.brain.compute(sensors)
-
-        if decision > 0.4:
-            self.state = State.SEEK
-        elif decision < -0.4:
-            self.state = State.FLEE
-        else:
-            self.state = State.WANDER
-
-        # Если существо сытое → хочет размножаться
+        # СНАЧАЛА проверяем энергию и устанавливаем REPRODUCE
         if self.energy > 80.0:
             self.state = State.REPRODUCE
+        else:
+            # Только если не сыт — перцептрон принимает решение
+            food_signal = 1.0 if visible_food else 0.0
+            energy_signal = max(0.0, min(1.0, self.energy / 50.0))
+            sensors = [food_signal, energy_signal, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+            decision = self.brain.compute(sensors)
+
+            if decision > 0.4:
+                self.state = State.SEEK
+            elif decision < -0.4:
+                self.state = State.FLEE
+            else:
+                self.state = State.WANDER
 
         # === НАВИГАЦИЯ ===
         
-        # 1. SEEK с A* (есть еда и pathfinder)
-        if self.state == State.SEEK and visible_food and pathfinder:
+        # 1. REPRODUCE → ищем партнера
+        if self.state == State.REPRODUCE and self.energy > 40:
+            if nearby_creatures:
+                # Ищем ближайшее существо в состоянии REPRODUCE
+                closest_partner = None
+                min_dist = float('inf')
+                
+                for other in nearby_creatures:
+                    if other is self:
+                        continue
+                    if other.state == State.REPRODUCE and other.energy > 40:
+                        dist_sq = (self.x - other.x) ** 2 + (self.y - other.y) ** 2
+                        if dist_sq < min_dist:
+                            min_dist = dist_sq
+                            closest_partner = other
+                
+                # Если нашли партнера → двигаемся к нему
+                if closest_partner is not None:
+                    self._apply_steering(dt, closest_partner.x, closest_partner.y)
+                else:
+                    # Партнера нет → блуждаем
+                    self._apply_wander(dt)
+            else:
+                # Нет списка существ → блуждаем
+                self._apply_wander(dt)
+        
+        # 2. SEEK с A* (есть еда и pathfinder)
+        elif self.state == State.SEEK and visible_food and pathfinder:
             closest_food = min(visible_food, key=lambda f: distance_sq((self.x, self.y), (f[0], f[1])))
             dist_to_food = distance_sq((self.x, self.y), (closest_food[0], closest_food[1])) ** 0.5
 
-            # Если еда близко (< 3 клеток), идём напрямую
             if dist_to_food < cfg.GRID_CELL_SIZE * 3:
                 self._apply_steering(dt, closest_food[0], closest_food[1])
                 self.current_path = None
                 self.path_index = 0
             else:
-                # Пересчитываем путь только если:
-                # 1. Пути нет
-                # 2. Путь закончился
-                # 3. Прошло больше 1 секунды с последнего пересчёта
                 should_recalculate = (
                     self.current_path is None or
                     self.path_index >= len(self.current_path) or
@@ -120,12 +140,10 @@ class Creature:
                     self.path_index = 0
                     self._last_path_recalc = self.age
 
-                # Двигаемся по пути
                 if self.current_path and self.path_index < len(self.current_path):
                     target_x, target_y = self.current_path[self.path_index]
                     dist_to_waypoint = distance_sq((self.x, self.y), (target_x, target_y))
                     
-                    # Порог достижения waypoint = полная клетка
                     if dist_to_waypoint < cfg.GRID_CELL_SIZE ** 2:
                         self.path_index += 1
 
@@ -135,26 +153,21 @@ class Creature:
                         self._apply_steering(dt, closest_food[0], closest_food[1])
                         self.current_path = None
                 else:
-                    # Путь не найден → блуждаем
                     self._apply_wander(dt)
         
-        # 2. SEEK без еды → переключаемся в WANDER
+        # 3. SEEK без еды → переключаемся в WANDER
         elif self.state == State.SEEK and not visible_food:
             self.state = State.WANDER
-            self._apply_movement(dt, visible_food, nearby_creatures)
+            self._apply_wander(dt)
         
-        # 3. REPRODUCE → ищем партнера (логика в _apply_movement)
-        elif self.state == State.REPRODUCE and self.energy > 40:
-            self._apply_movement(dt, visible_food, nearby_creatures)
-        
-        # 4. Все остальные состояния (WANDER, FLEE, REPRODUCE без партнера)
+        # 4. Все остальные состояния (WANDER, FLEE)
         else:
             self._apply_movement(dt, visible_food, nearby_creatures)
 
         self._clamp_to_bounds()
         self.age += dt
         
-        # Сохраняем позицию в след (максимум 20 точек)
+        # Сохраняем позицию в след
         self.trail.append((self.x, self.y))
         if len(self.trail) > 20:
             self.trail.pop(0)
@@ -277,9 +290,28 @@ class Creature:
         self.y = new_y
 
     def _clamp_to_bounds(self) -> None:
-        """Удерживает существо в пределах игрового окна."""
-        self.x = max(self.radius, min(self.x, cfg.SCREEN_WIDTH - self.radius))
-        self.y = max(self.radius, min(self.y, cfg.SCREEN_HEIGHT - self.radius))
+        """Удерживает существо в пределах игрового окна и отражает скорость от стен."""
+        margin = self.radius + 2.0  # Небольшой отступ от края
+        
+        # Левая/правая стена
+        if self.x < margin:
+            self.x = margin
+            if self.vx < 0:  # Только если летит В стену
+                self.vx = -self.vx * 0.5 + random.uniform(-10, 10)
+        elif self.x > cfg.SCREEN_WIDTH - margin:
+            self.x = cfg.SCREEN_WIDTH - margin
+            if self.vx > 0:
+                self.vx = -self.vx * 0.5 + random.uniform(-10, 10)
+        
+        # Верхняя/нижняя стена
+        if self.y < margin:
+            self.y = margin
+            if self.vy < 0:
+                self.vy = -self.vy * 0.5 + random.uniform(-10, 10)
+        elif self.y > cfg.SCREEN_HEIGHT - margin:
+            self.y = cfg.SCREEN_HEIGHT - margin
+            if self.vy > 0:
+                self.vy = -self.vy * 0.5 + random.uniform(-10, 10)
 
     def get_render_data(self) -> dict:
         """Возвращает чистые данные для View."""

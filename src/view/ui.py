@@ -111,61 +111,58 @@ class Slider:
 
 class SettingsPanel:
     """Панель настроек среды. Открывается по клавише S."""
-
+    
     def __init__(self, screen_width: float, screen_height: float):
         self.visible = False
         self.width = 320
-        self.height = 260
+        self.height = 310  # ✅ Увеличили высоту с 260 до 310 для нового ползунка
         self.x = screen_width - self.width - 20
         self.y = 20
-
+        
         self.sliders: List[Slider] = [
             Slider(
                 "Мутация (rate)",
-                self.x + 20,
-                self.y + 40,
-                240,
-                min_val=0.01,
-                max_val=0.5,
+                self.x + 20, self.y + 40, 240,
+                min_val=0.01, max_val=0.5,
                 get_value=lambda: cfg.MUTATION_RATE,
-                set_value=lambda v: setattr(cfg, "MUTATION_RATE", v),
-                decimals=2,
+                set_value=lambda v: setattr(cfg, 'MUTATION_RATE', v),
+                decimals=2
             ),
             Slider(
                 "Сила мутации",
-                self.x + 20,
-                self.y + 90,
-                240,
-                min_val=0.05,
-                max_val=1.0,
+                self.x + 20, self.y + 90, 240,
+                min_val=0.05, max_val=1.0,
                 get_value=lambda: cfg.MUTATION_STRENGTH,
-                set_value=lambda v: setattr(cfg, "MUTATION_STRENGTH", v),
-                decimals=2,
+                set_value=lambda v: setattr(cfg, 'MUTATION_STRENGTH', v),
+                decimals=2
             ),
             Slider(
                 "Плотность еды",
-                self.x + 20,
-                self.y + 140,
-                240,
-                min_val=0.005,
-                max_val=0.1,
+                self.x + 20, self.y + 140, 240,
+                min_val=0.005, max_val=0.1,
                 get_value=lambda: cfg.FOOD_SPAWN_RATE,
-                set_value=lambda v: setattr(cfg, "FOOD_SPAWN_RATE", v),
-                decimals=3,
+                set_value=lambda v: setattr(cfg, 'FOOD_SPAWN_RATE', v),
+                decimals=3
             ),
             Slider(
                 "Расход энергии",
-                self.x + 20,
-                self.y + 190,
-                240,
-                min_val=1.0,
-                max_val=15.0,
+                self.x + 20, self.y + 190, 240,
+                min_val=1.0, max_val=15.0,
                 get_value=lambda: cfg.ENERGY_DECAY,
-                set_value=lambda v: setattr(cfg, "ENERGY_DECAY", v),
-                decimals=1,
+                set_value=lambda v: setattr(cfg, 'ENERGY_DECAY', v),
+                decimals=1
+            ),
+        
+            Slider(
+                "Время поколения (с)",
+                self.x + 20, self.y + 240, 240,
+                min_val=10.0, max_val=120.0,
+                get_value=lambda: cfg.GENERATION_TIME,
+                set_value=lambda v: setattr(cfg, 'GENERATION_TIME', v),
+                decimals=0  # Целые секунды
             ),
         ]
-
+        
         self.font_title = pygame.font.SysFont("consolas", 16, bold=True)
         self.font_hint = pygame.font.SysFont("consolas", 12)
 
