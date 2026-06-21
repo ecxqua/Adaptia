@@ -58,7 +58,8 @@ class Creature:
         self,
         dt: float,
         visible_food: List[Tuple[float, float, float]],
-        pathfinder: Optional[AStarPathfinder] = None
+        pathfinder: Optional[AStarPathfinder] = None,
+        nearby_creatures: Optional[List['Creature']] = None
     ) -> bool:
         """Обновляет параметры существа за кадр. Перцептрон управляет состоянием."""
         self.energy -= cfg.ENERGY_DECAY * dt
@@ -84,7 +85,13 @@ class Creature:
         else:
             self.state = State.WANDER
 
-        # Навигация
+        # Если существо сытое → хочет размножаться
+        if self.energy > 80.0:
+            self.state = State.REPRODUCE
+
+        # === НАВИГАЦИЯ ===
+        
+        # 1. SEEK с A* (есть еда и pathfinder)
         if self.state == State.SEEK and visible_food and pathfinder:
             closest_food = min(visible_food, key=lambda f: distance_sq((self.x, self.y), (f[0], f[1])))
             dist_to_food = distance_sq((self.x, self.y), (closest_food[0], closest_food[1])) ** 0.5
@@ -130,20 +137,28 @@ class Creature:
                 else:
                     # Путь не найден → блуждаем
                     self._apply_wander(dt)
-        # Если в SEEK но нет еды → переключаемся в WANDER
+        
+        # 2. SEEK без еды → переключаемся в WANDER
         elif self.state == State.SEEK and not visible_food:
-            self.state = State.WANDER  # ← Нет цели, блуждаем случайно
-            self._apply_movement(dt, visible_food)        
+            self.state = State.WANDER
+            self._apply_movement(dt, visible_food, nearby_creatures)
+        
+        # 3. REPRODUCE → ищем партнера (логика в _apply_movement)
+        elif self.state == State.REPRODUCE and self.energy > 40:
+            self._apply_movement(dt, visible_food, nearby_creatures)
+        
+        # 4. Все остальные состояния (WANDER, FLEE, REPRODUCE без партнера)
         else:
-            # Не SEEK → обычное поведение с проверкой препятствий
-            self._apply_movement(dt, visible_food)
+            self._apply_movement(dt, visible_food, nearby_creatures)
 
         self._clamp_to_bounds()
         self.age += dt
+        
         # Сохраняем позицию в след (максимум 20 точек)
         self.trail.append((self.x, self.y))
         if len(self.trail) > 20:
             self.trail.pop(0)
+        
         return True
 
     def _check_obstacle_collision(self, new_x: float, new_y: float) -> bool:
@@ -168,13 +183,45 @@ class Creature:
         
         return False
 
-    def _apply_movement(self, dt: float, visible_food: List[Tuple[float, float, float]]) -> None:
+    def _apply_movement(self, dt: float, visible_food: List[Tuple[float, float, float]], 
+                        nearby_creatures: Optional[List['Creature']] = None) -> None:
         """Применяет силы управления к скорости существа (Steering Behaviors)."""
         from src.algorithms import steering
 
         force_x, force_y = 0.0, 0.0
 
-        if self.state == State.SEEK and visible_food:
+        # Логика для REPRODUCE: поиск партнера
+        if self.state == State.REPRODUCE and self.energy > 40 and nearby_creatures:
+            # Ищем ближайшее существо в состоянии REPRODUCE
+            closest_partner = None
+            min_dist = float('inf')
+            
+            for other in nearby_creatures:
+                if other is self:  # Пропускаем себя
+                    continue
+                if other.state == State.REPRODUCE and other.energy > 40:
+                    dist_sq = (self.x - other.x) ** 2 + (self.y - other.y) ** 2
+                    if dist_sq < min_dist:
+                        min_dist = dist_sq
+                        closest_partner = other
+            
+            # Если нашли партнера → двигаемся к нему
+            if closest_partner is not None:
+                fx, fy = steering.seek(
+                    (self.x, self.y), 
+                    (closest_partner.x, closest_partner.y), 
+                    cfg.SEEK_SPEED, 
+                    (self.vx, self.vy)
+                )
+                force_x += fx
+                force_y += fy
+            else:
+                # Партнера нет → блуждаем
+                force_x = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
+                force_y = random.uniform(-cfg.MAX_STEERING_FORCE, cfg.MAX_STEERING_FORCE)
+
+        elif self.state == State.SEEK and visible_food:
+            # Fallback для SEEK без pathfinder
             closest_food_pos = None
             min_dist = float('inf')
             for fx, fy, _ in visible_food:
@@ -198,10 +245,6 @@ class Creature:
             angle = random.uniform(0, math.pi * 2)
             force_x = math.cos(angle) * cfg.SEEK_SPEED
             force_y = math.sin(angle) * cfg.SEEK_SPEED
-
-        elif self.state == State.REPRODUCE:
-            force_x = random.uniform(-5.0, 5.0)
-            force_y = random.uniform(-5.0, 5.0)
 
         # Ограничиваем силу поворота/ускорения
         force_len = (force_x ** 2 + force_y ** 2) ** 0.5

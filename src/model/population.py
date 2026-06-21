@@ -20,7 +20,6 @@ class Population:
     def evaluate_fitness(self, creature: Creature) -> float:
         """Рассчитывает приспособленность существа.
         Чем выше число, тем лучше гены.
-        Подсказка: используй energy, время жизни, или количество съеденной еды.
         """
         fitness = creature.energy + (creature.age * cfg.FITNESS_AGE_REWARD)
         

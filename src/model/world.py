@@ -8,6 +8,7 @@ from utils.collision import check_circle_collision
 from src.algorithms.spatial_grid import SpatialGrid
 from src.model.population import Population
 from src.algorithms.astar import AStarPathfinder
+from src.algorithms import ga
 
 
 class World:
@@ -63,8 +64,11 @@ class World:
             nearby = self.grid.query_radius((c.x, c.y), cfg.PERCEPTION_RADIUS)
             food_only = [item for item in nearby if isinstance(item, tuple) and len(item) == 3]
 
+            # Передаём список других существ для поиска партнера
+            nearby_creatures = [item for item in nearby if isinstance(item, Creature)]
+
             # Передаём pathfinder в update!
-            if c.update(dt, food_only, self.pathfinder):
+            if c.update(dt, food_only, self.pathfinder, nearby_creatures):
                 alive_creatures.append(c)
         self.creatures = alive_creatures
 
