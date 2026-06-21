@@ -12,6 +12,7 @@ class SpatialGrid:
         self.cell_size = cell_size
         self.cols = math.ceil(cfg.SCREEN_WIDTH / cell_size)
         self.rows = math.ceil(cfg.SCREEN_HEIGHT / cell_size)
+        # Создаём двумерный список (матрицу) пустых ячеек
         self.grid = [[[] for _ in range(self.cols)] for _ in range(self.rows)]
 
     def clear(self) -> None:
@@ -24,6 +25,7 @@ class SpatialGrid:
         """Добавляет объект в соответствующую ячейку по его позиции."""
         col = int(pos[0] // self.cell_size)
         row = int(pos[1] // self.cell_size)
+         # Проверяем, что координаты в пределах сетки
         if 0 <= col < self.cols and 0 <= row < self.rows:
             self.grid[row][col].append(obj)
 

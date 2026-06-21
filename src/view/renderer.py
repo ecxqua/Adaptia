@@ -59,10 +59,10 @@ class Renderer:
                 pygame.draw.circle(self.screen, color, pos, radius)
 
             # Отрисовка препятствий ← ДОБАВИТЬ
-        for ox, oy in world.get_obstacles():
-            # Рисуем квадрат 20x20 пикселей (размер клетки A*)
-            rect = pygame.Rect(int(ox) - 10, int(oy) - 10, 20, 20)
-            pygame.draw.rect(self.screen, (128, 128, 128), rect)  # Серый цвет
+        for grid_x, grid_y in world.obstacles:
+            world_x = grid_x * cfg.GRID_CELL_SIZE
+            world_y = grid_y * cfg.GRID_CELL_SIZE
+            pygame.draw.rect(self.screen, (128, 128, 128), (world_x, world_y, cfg.GRID_CELL_SIZE, cfg.GRID_CELL_SIZE))
 
 
         for food_x, food_y, _ in world.food:

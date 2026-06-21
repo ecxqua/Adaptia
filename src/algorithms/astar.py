@@ -60,9 +60,6 @@ class AStarPathfinder:
         grid_pos = self.world_to_grid(x, y)
         self.obstacles.discard(grid_pos)
     
-    def clear_obstacles(self) -> None:
-        """Очищает все препятствия."""
-        self.obstacles.clear()
     
     def _heuristic(self, a: Tuple[int, int], b: Tuple[int, int]) -> float:
         """Эвристическая функция: манхэттенское расстояние."""
@@ -171,5 +168,5 @@ class AStarPathfinder:
         while current.position in came_from:
             current = came_from[current.position]
             path.append(self.grid_to_world(*current.position))
-        path.reverse()
+        path.reverse() # шли от цели к старту, но существо должно двигаться от старта к цели
         return path

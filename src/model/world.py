@@ -17,7 +17,7 @@ class World:
         self.creatures: list[Creature] = []
         self.food: list[tuple[float, float, float]] = []
         self.grid = SpatialGrid(cell_size=50.0)
-        self.obstacles: list[tuple[float, float]] = []
+        self.obstacles: list[tuple[int, int]] = []
         self.evolution_timer = 0.0
         self.particles: list[dict] = []
 
@@ -35,17 +35,36 @@ class World:
 
     def spawn_obstacle_at(self, x: float, y: float) -> None:
         """Создаёт препятствие в указанных координатах (для A* и рендера)."""
-        # 1. Добавляем в навигационную сетку A* (чтобы существа обходили)
+        # Добавляем в навигационную сетку A*
         self.pathfinder.add_obstacle(x, y)
+        
+        # Сохраняем СЕТОЧНЫЕ координаты для рендера
+        grid_pos = self.pathfinder.world_to_grid(x, y)
+        if grid_pos not in self.obstacles:  # ← Проверка на дубликаты
+            self.obstacles.append(grid_pos)
 
-        # 2. Добавляем в список для визуализации
-        self.obstacles.append((x, y))
-
-    def remove_obstacle(self, x: float, y: float) -> None:
-        """Удаляет препятствие."""
-        self.pathfinder.remove_obstacle(x, y)
-        # Удаляем из списка рендера
-        self.obstacles = [(ox, oy) for ox, oy in self.obstacles if (ox, oy) != (x, y)]
+    def remove_obstacle(self, x: float, y: float) -> bool:
+        """
+        Удаляет препятствие в указанной точке (если оно есть).
+        Теперь работает при клике в ЛЮБУЮ точку квадрата!
+        """
+        # Получаем клетку, куда кликнули
+        grid_pos = self.pathfinder.world_to_grid(x, y)
+        
+        # Проверяем, есть ли препятствие в этой клетке
+        if grid_pos not in self.obstacles:
+            return False
+        
+        # 1. Удаляем из навигационной сетки A*
+        self.pathfinder.remove_obstacle(
+            grid_pos[0] * self.pathfinder.cell_size,
+            grid_pos[1] * self.pathfinder.cell_size
+        )
+        
+        # 2. Удаляем из списка для рендера (теперь это просто!)
+        self.obstacles.remove(grid_pos)
+        
+        return True
 
     def get_obstacles(self) -> list[tuple[float, float]]:
         """Возвращает список препятствий для рендера."""

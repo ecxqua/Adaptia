@@ -173,7 +173,14 @@ class GameLoop:
                 if event.button == 1:
                     self.world.spawn_food_at(x, y)
                 elif event.button == 3:
-                    self.world.spawn_obstacle_at(x, y)
+                    if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                        removed = self.world.remove_obstacle(x, y)
+                        if removed:
+                            print(f"[WORLD] Препятствие удалено в ({x}, {y})")
+                        else:
+                            print(f"[WORLD] Нет препятствия в ({x}, {y})")
+                    else:
+                        self.world.spawn_obstacle_at(x, y)
 
     def _update(self, dt: float) -> None:
         """Обновляет состояние мира на один кадр.
