@@ -11,6 +11,8 @@ DEBUG_MODE: Final[bool] = True
 INIT_POP_SIZE: Final[int] = 20
 FOOD_SPAWN_RATE: Final[float] = 0.02  # вероятность спавна еды за кадр
 ENERGY_DECAY: Final[float] = 1.0      # потеря энергии за кадр
+FOOD_ENERGY = 15.0           # Энергетическая ценность одного куска
+FOOD_RADIUS = 4.0            # Радиус куска еды
 ENERGY_THRESHOLD: Final[float] = 40.0  # мин. энергия для размножения
 SEEK_SPEED: Final[float] = 80.0          # Скорость движения к еде
 PERCEPTION_RADIUS: Final[float] = 100.0  # Радиус "зрения" существа
@@ -34,3 +36,7 @@ FITNESS_AGE_REWARD: Final[float] = 5.0  # Награда за каждую се�
 GRID_CELL_SIZE: Final[float] = 40.0  # Размер клетки сетки
 GRID_WIDTH: Final[int] = int(SCREEN_WIDTH / GRID_CELL_SIZE)
 GRID_HEIGHT: Final[int] = int(SCREEN_HEIGHT / GRID_CELL_SIZE)
+
+# Размножение
+REPRODUCE_MIN_ENERGY = 40.0  # Минимальная энергия для размножения
+REPRODUCE_COST = 20.0        # Энергия, которую тратят родители
