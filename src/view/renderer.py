@@ -58,7 +58,7 @@ class Renderer:
             else:
                 pygame.draw.circle(self.screen, color, pos, radius)
 
-            # Отрисовка препятствий ← ДОБАВИТЬ
+            # Отрисовка препятствий 
         for grid_x, grid_y in world.obstacles:
             world_x = grid_x * cfg.GRID_CELL_SIZE
             world_y = grid_y * cfg.GRID_CELL_SIZE
@@ -79,11 +79,6 @@ class Renderer:
             # поэтому делаем эффект затухания через уменьшение размера
             radius = max(1, int(3 * p['life']))
             pygame.draw.circle(self.screen, p['color'], (int(p['x']), int(p['y'])), radius)
-        # # Отладочная инфа в углу экрана
-        # if hasattr(world, 'get_creature_count'):
-        #     font = pygame.font.SysFont("consolas", 12)
-        #     text = f"Creatures: {world.get_creature_count()}"
-        #     self.screen.blit(font.render(text, True, (200, 200, 200)), (10, 10))
         
         # отладка
         if cfg.DEBUG_MODE:

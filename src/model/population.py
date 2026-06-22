@@ -23,8 +23,6 @@ class Population:
         """
         fitness = creature.energy + (creature.age * cfg.FITNESS_AGE_REWARD)
         
-        # отладка
-        # print(f"[FITNESS] Energy={creature.energy:.1f}, Age={creature.age:.1f} → {fitness:.2f}")
         
         return fitness
 
